@@ -37,14 +37,17 @@ export default function OperationDetail() {
 
     try {
       await uploadMutation.mutateAsync({
-        operationId,
-        file,
-        type: uploadType,
+        id: operationId,
+        data: {
+          file,
+          type: uploadType,
+        },
       });
       queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
       if (fileInputRef.current) fileInputRef.current.value = "";
-    } catch (err) {
-      alert("Error al subir la captura");
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      alert("Error al subir la captura: " + (err?.message || "Error desconocido"));
     }
   };
 
@@ -53,8 +56,9 @@ export default function OperationDetail() {
     try {
       await deleteMutation.mutateAsync({ operationId, receiptId });
       queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
-    } catch (err) {
-      alert("Error al eliminar la captura");
+    } catch (err: any) {
+      console.error("Delete error:", err);
+      alert("Error al eliminar la captura: " + (err?.message || "Error desconocido"));
     }
   };
 
