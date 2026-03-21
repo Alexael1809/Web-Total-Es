@@ -1,0 +1,64 @@
+Gemini ha dicho
+¡Entendido! Este es un salto de calidad enorme para tu plataforma. El error de restar la tasa de cambio en lugar de usarla para proyectar la ganancia es muy común en calculadoras básicas, pero en el arbitraje profesional, el Spread lo es todo.
+
+Además, el concepto de "Cerrar el Ciclo" (pasar de Fiat de vuelta a USDT) es la verdadera métrica de éxito en P2P.
+
+Aquí tienes el prompt reestructurado, limpio y súper detallado para que Replit entienda la matemática exacta. Como "Plus", le agregué un sistema de "Estados visuales" (Status Badges) para que en tu panel veas fácilmente qué operaciones están "Abiertas" (el dinero está en fiat o en la plataforma intermediaria) y cuáles están "Cerradas" (ya tienes los USDT de vuelta).
+
+Copia y pega este texto en Replit:
+
+Actúa como un Desarrollador Full-Stack Senior experto en matemáticas financieras y bases de datos relacionales. Necesito hacer una actualización profunda a la lógica de negocio, interfaz y base de datos de mi App de Arbitraje P2P (React + Supabase).
+
+Aplica estrictamente los siguientes requerimientos:
+
+1. Reingeniería del Motor de Cálculo (Tasa de Cambio y Spread):
+
+Corrección vital: La "Tasa de Cambio" NO debe restar. Debe usarse para calcular el valor proyectado (sumar/multiplicar). Las únicas variables que restan son las "Comisiones".
+
+Selector Dinámico de Tasa: En el formulario de nueva operación, el campo "Tasa/Spread" debe tener un Toggle que permita elegir ingresar el dato de dos formas:
+
+Opción A (Tasa Directa): Ej. 1 USDT = 1.080.
+
+Opción B (Porcentaje): Ej. 8%.
+
+Ejemplo de Lógica Esperada: Monto bruto operado: 100 USDT. Tasa: 1.080 (o +8%). Si las comisiones son 0, la "Ganancia Bruta FIAT" proyectada es 8.
+
+La Ganancia Neta FIAT será la Ganancia Bruta menos la suma de (Comisión Banco + Comisión Binance + Comisión Servidor).
+
+2. Flujo de "Cierre de Ciclo" (Retorno a USDT):
+
+El arbitraje tiene dos fases. Necesito poder actualizar una operación ya guardada.
+
+En la tabla de "Operaciones", añade una acción al hacer clic en una operación llamada "Cerrar Ciclo (Agregar USDT)".
+
+Esto abrirá un modal donde el usuario ingresará el "Monto Final USDT Recibido" tras recomprar los USDT.
+
+Cálculo de Ganancia Real USDT: (Monto Final USDT Recibido) - (Monto Bruto Operado Inicial) = Ganancia Neta Real USDT.
+
+Ejemplo: Operé 100 USDT bruto. Recibí 108 FIAT. Tras el ciclo, recompré y obtuve 105 USDT. La ganancia real a registrar es 5 USDT.
+
+Plus UI: Añade un "Status Badge" a cada fila de la tabla: "🟡 Abierta (En FIAT)" y "🟢 Cerrada (En USDT)".
+
+3. Trazabilidad de Plataformas (El Puente):
+
+Actualiza el modelo de datos y el formulario para incluir "Plataforma Intermediaria" (Ej. Zinli, Facebank, Global66, Wise).
+
+El flujo ahora es: Plataforma Origen -> Plataforma Intermediaria -> Plataforma Destino.
+
+La comisión que se cobre por enviar el dinero a la "Plataforma Intermediaria" debe registrarse y descontarse automáticamente usando el campo ya existente de "Comisión Servidor".
+
+4. Módulo de Comprobantes (Drag & Drop Avanzado):
+
+En la vista de detalle de las "Operaciones Guardadas", implementa una zona Drag-and-Drop para subir capturas de pantalla.
+
+Estas imágenes deben ir directo al Storage de Supabase vinculadas al ID de esa operación.
+
+Tagging Obligatorio: Antes de subir la imagen, el usuario debe seleccionar si el comprobante es de un dinero "ENVIADO" o "RECIBIDO". Muestra estas imágenes en la vista de la operación organizadas por su tag para búsquedas rápidas.
+
+5. Dashboard Financiero (Métricas Reales):
+
+Ganancia Neta (USDT): Esta tarjeta en el dashboard principal SOLAMENTE debe sumar la "Ganancia Real USDT" de las operaciones que tengan el status "🟢 Cerrada (En USDT)".
+
+Comisiones Totales: Crea una tarjeta/sección que sume todas las comisiones gastadas y las compare frente al Importe Bruto Operado histórico, mostrando el porcentaje de eficiencia (ej. "Gastaste 3 USDT en comisiones para operar 100 USDT").
+
+Por favor, actualiza el esquema de Supabase si es necesario para soportar los nuevos campos (plataforma_intermediaria, status_ciclo, monto_final_usdt) y reescribe los componentes de React afectados.

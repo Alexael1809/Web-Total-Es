@@ -1,0 +1,61 @@
+Actúa como un Desarrollador Full-Stack Senior experto en matemáticas financieras y bases de datos relacionales. Necesito hacer una actualización profunda a la lógica de negocio, interfaz y base de datos de mi App de Arbitraje P2P (React + Supabase).
+
+Aplica estrictamente los siguientes requerimientos:
+
+1. Reingeniería del Motor de Cálculo (Tasa de Cambio y Spread):
+
+Corrección vital: La "Tasa de Cambio" NO debe restar. Debe usarse para calcular el valor proyectado (sumar/multiplicar). Las únicas variables que restan son las "Comisiones".
+
+Selector Dinámico de Tasa: En el formulario, el campo "Tasa/Spread" debe tener un Toggle para ingresar el dato como Tasa Directa (Ej. 1 USDT = 1.080) o como Porcentaje (Ej. 8%).
+
+Lógica: Monto bruto operado: 100 USDT. Tasa: 1.080 (o +8%). Si las comisiones son 0, la "Ganancia Bruta FIAT" es 8. La "Ganancia Neta FIAT" será la Ganancia Bruta menos la suma de (Comisión Banco + Comisión Binance + Comisión Servidor).
+
+2. Flujo de "Cierre de Ciclo" (Retorno a USDT):
+
+En la tabla de "Operaciones", añade un botón: "Cerrar Ciclo (Agregar USDT)".
+
+Esto abrirá un modal para ingresar el "Monto Final USDT Recibido" tras recomprar los USDT.
+
+Cálculo de Ganancia Real USDT: (Monto Final USDT Recibido) - (Monto Bruto Operado Inicial) = Ganancia Neta Real USDT.
+
+Añade un "Status Badge" a cada fila: "🟡 Abierta (En FIAT)" y "🟢 Cerrada (En USDT)".
+
+3. Trazabilidad de Plataformas (El Puente):
+
+Incluye el campo "Plataforma Intermediaria". El flujo es: Plataforma Origen -> Plataforma Intermediaria -> Plataforma Destino. La comisión de este paso se vincula a "Comisión Servidor".
+
+4. Módulo de Comprobantes (Drag & Drop Avanzado):
+
+Implementa Drag-and-Drop en el detalle de las operaciones para subir imágenes a Supabase Storage (Bucket: comprobantes).
+
+El usuario debe etiquetar la imagen obligatoriamente como "ENVIADO" o "RECIBIDO".
+
+5. Dashboard Financiero (Métricas Reales):
+
+Ganancia Neta (USDT): Suma únicamente la "Ganancia Real USDT" de las operaciones con status "🟢 Cerrada".
+
+Comisiones Totales: Compara la suma de comisiones gastadas frente al Importe Bruto Operado.
+
+6. Control Total de Datos (CRUD Completo):
+
+Añade la opción visible (un botón de papelera) para eliminar permanentemente cualquier "Operación" o "Reporte de Socios" desde la interfaz.
+
+Debe mostrar siempre un modal de confirmación antes de borrar ("¿Estás seguro de eliminar este registro?") para evitar accidentes.
+
+7. Purga de Datos y Simulación de Quality Assurance (QA):
+
+Paso A: Ejecuta un comando/script para limpiar (TRUNCATE/DELETE) absolutamente todos los registros de prueba actuales en la base de datos de Supabase. Quiero empezar de cero.
+
+Paso B: Escribe una función de Testing Automatizado o un "Seed Script" que simule el flujo completo de un usuario real haciendo arbitraje. El script debe:
+
+Simular la creación de una operación con distintas monedas y plataformas.
+
+Simular el guardado de la URL de un comprobante con sus etiquetas.
+
+Simular el "Cierre de Ciclo" inyectando el retorno en USDT.
+
+Simular la exportación y guardado de reportes.
+
+Paso C: Haz una revisión lógica (Self-Correction) de tu propio código. Verifica que el Testing matemático cuadre al centavo en las métricas de ganancias. Si detectas que algo no funciona en este flujo simulado, corrígelo de inmediato antes de entregarme la versión final de los componentes.
+
+Por favor, actualiza el esquema de Supabase si es necesario para soportar los nuevos campos (plataforma_intermediaria, status_ciclo, monto_final_usdt) y reescribe los componentes de React afectados y todo lo que creas necessario.

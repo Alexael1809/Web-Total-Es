@@ -11,18 +11,25 @@ import fs from "fs";
 
 const router = Router();
 
+// New formula: tasa is the spread multiplier (e.g. 1.08 = 8% profit)
+// montoBruto is in USDT; all commissions in USDT
 const CreateOperationBody = z.object({
   fecha: z.string().min(1),
   moneda: z.enum(["PAB", "USD", "VES", "COP"]),
-  tasaDeCambio: z.coerce.number(),
+  tasaDeCambio: z.coerce.number().min(1, "Tasa inválida"),
   plataformaOrigen: z.string().min(1),
+  plataformaIntermediaria: z.string().optional(),
   plataformaDestino: z.string().min(1),
-  montoBruto: z.coerce.number(),
-  comisionBanco: z.coerce.number().default(0),
-  comisionBinance: z.coerce.number().default(0),
-  comisionServidor: z.coerce.number().default(0),
-  comisionServidorEnUsdt: z.boolean().default(false),
+  montoBruto: z.coerce.number().min(0),
+  comisionBanco: z.coerce.number().min(0).default(0),
+  comisionBinance: z.coerce.number().min(0).default(0),
+  comisionServidor: z.coerce.number().min(0).default(0),
+  comisionServidorEnUsdt: z.boolean().default(true),
   notas: z.string().optional(),
+});
+
+const CerrarCicloBody = z.object({
+  montoFinalUsdt: z.coerce.number().min(0),
 });
 
 const uploadsDir = path.resolve(process.cwd(), "uploads");
@@ -37,22 +44,20 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
+// New calculation: tasa = spread multiplier (1.08 = 8% profit per USDT)
+// All commissions are in USDT
 function calculateNetProfit(
   montoBruto: number,
-  tasaDeCambio: number,
+  tasa: number,
   comisionBanco: number,
   comisionBinance: number,
-  comisionServidor: number,
-  comisionServidorEnUsdt: boolean
+  comisionServidor: number
 ) {
-  const spreadUsdt = montoBruto / tasaDeCambio;
-  const comisionBancoUsdt = comisionBanco / tasaDeCambio;
-  const comisionServidorUsdt = comisionServidorEnUsdt
-    ? comisionServidor
-    : comisionServidor / tasaDeCambio;
-  const totalComisionesUsdt = comisionBancoUsdt + comisionBinance + comisionServidorUsdt;
-  const gananciaNetaUsdt = spreadUsdt - totalComisionesUsdt;
-  const gananciaNeta = gananciaNetaUsdt * tasaDeCambio;
+  const spread = tasa - 1; // e.g. 1.08 - 1 = 0.08
+  const gananciaBrutaUsdt = montoBruto * spread;
+  const totalComisiones = comisionBanco + comisionBinance + comisionServidor;
+  const gananciaNetaUsdt = gananciaBrutaUsdt - totalComisiones;
+  const gananciaNeta = gananciaNetaUsdt; // stored as USDT equivalent
   return { gananciaNeta, gananciaNetaUsdt };
 }
 
@@ -66,6 +71,8 @@ function formatOperation(op: any, receipts: any[]) {
     comisionServidor: parseFloat(op.comisionServidor),
     gananciaNeta: parseFloat(op.gananciaNeta),
     gananciaNetaUsdt: parseFloat(op.gananciaNetaUsdt),
+    montoFinalUsdt: op.montoFinalUsdt != null ? parseFloat(op.montoFinalUsdt) : null,
+    gananciaRealUsdt: op.gananciaRealUsdt != null ? parseFloat(op.gananciaRealUsdt) : null,
     receipts,
   };
 }
@@ -122,7 +129,7 @@ router.post("/", authenticate, async (req, res) => {
   const comisionServidor = parseFloat((data.comisionServidor ?? 0) as any);
 
   const { gananciaNeta, gananciaNetaUsdt } = calculateNetProfit(
-    montoBruto, tasaDeCambio, comisionBanco, comisionBinance, comisionServidor, data.comisionServidorEnUsdt
+    montoBruto, tasaDeCambio, comisionBanco, comisionBinance, comisionServidor
   );
 
   const [op] = await db.insert(operationsTable).values({
@@ -131,6 +138,7 @@ router.post("/", authenticate, async (req, res) => {
     moneda: data.moneda,
     tasaDeCambio: tasaDeCambio.toString(),
     plataformaOrigen: data.plataformaOrigen,
+    plataformaIntermediaria: data.plataformaIntermediaria || null,
     plataformaDestino: data.plataformaDestino,
     montoBruto: montoBruto.toString(),
     comisionBanco: comisionBanco.toString(),
@@ -139,6 +147,7 @@ router.post("/", authenticate, async (req, res) => {
     comisionServidorEnUsdt: data.comisionServidorEnUsdt,
     gananciaNeta: gananciaNeta.toString(),
     gananciaNetaUsdt: gananciaNetaUsdt.toString(),
+    statusCiclo: "abierta",
     notas: data.notas,
   }).returning();
 
@@ -160,7 +169,7 @@ router.put("/:id", authenticate, async (req, res) => {
   const comisionServidor = parseFloat((data.comisionServidor ?? 0) as any);
 
   const { gananciaNeta, gananciaNetaUsdt } = calculateNetProfit(
-    montoBruto, tasaDeCambio, comisionBanco, comisionBinance, comisionServidor, data.comisionServidorEnUsdt
+    montoBruto, tasaDeCambio, comisionBanco, comisionBinance, comisionServidor
   );
 
   const [op] = await db.update(operationsTable).set({
@@ -168,6 +177,7 @@ router.put("/:id", authenticate, async (req, res) => {
     moneda: data.moneda,
     tasaDeCambio: tasaDeCambio.toString(),
     plataformaOrigen: data.plataformaOrigen,
+    plataformaIntermediaria: data.plataformaIntermediaria || null,
     plataformaDestino: data.plataformaDestino,
     montoBruto: montoBruto.toString(),
     comisionBanco: comisionBanco.toString(),
@@ -191,6 +201,35 @@ router.delete("/:id", authenticate, async (req, res) => {
   const id = parseInt(req.params.id);
   await db.delete(operationsTable).where(eq(operationsTable.id, id));
   res.json({ success: true, message: "Operación eliminada" });
+});
+
+// Cerrar Ciclo: register the final USDT received after buying back
+router.post("/:id/cerrar-ciclo", authenticate, async (req, res) => {
+  const id = parseInt(req.params.id);
+  const parsed = CerrarCicloBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "bad_request", message: "montoFinalUsdt requerido" });
+    return;
+  }
+
+  const [op] = await db.select().from(operationsTable).where(eq(operationsTable.id, id));
+  if (!op) {
+    res.status(404).json({ error: "not_found", message: "Operación no encontrada" });
+    return;
+  }
+
+  const montoBruto = parseFloat(op.montoBruto as any);
+  const montoFinal = parsed.data.montoFinalUsdt;
+  const gananciaRealUsdt = montoFinal - montoBruto;
+
+  const [updated] = await db.update(operationsTable).set({
+    statusCiclo: "cerrada",
+    montoFinalUsdt: montoFinal.toString(),
+    gananciaRealUsdt: gananciaRealUsdt.toString(),
+  }).where(eq(operationsTable.id, id)).returning();
+
+  const receipts = await db.select().from(receiptsTable).where(eq(receiptsTable.operationId, id));
+  res.json(formatOperation(updated, receipts));
 });
 
 router.post("/:id/receipts", authenticate, upload.single("file"), async (req, res) => {

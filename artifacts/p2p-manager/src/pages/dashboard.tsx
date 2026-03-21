@@ -9,6 +9,7 @@ import {
   Activity,
   Clock,
   Landmark,
+  CheckCircle2,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -17,11 +18,7 @@ export default function Dashboard() {
 
   const { data, isLoading } = useGetDashboardSummary(
     { date },
-    {
-      query: {
-        queryKey: ["/api/dashboard/summary", date],
-      },
-    }
+    { query: { queryKey: ["/api/dashboard/summary", date] } }
   );
 
   if (isLoading) {
@@ -32,9 +29,9 @@ export default function Dashboard() {
     );
   }
 
-  const summary = data;
+  const summary = data as any;
   const volumenData: Array<{ plataforma: string; volumen: number }> =
-    (summary?.volumenPorPlataforma as any) ?? [];
+    summary?.volumenPorPlataforma ?? [];
   const maxVolumen = Math.max(...volumenData.map((d) => d.volumen), 1);
 
   return (
@@ -60,17 +57,19 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
+          {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="glass-panel p-6 rounded-2xl">
+            <div className="glass-panel p-6 rounded-2xl border border-success/10">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Ganancia Neta (USDT)</p>
+                  <p className="text-xs font-medium text-success mb-1">Ganancia Real USDT</p>
                   <h3 className="text-3xl font-display font-bold text-success">
-                    {formatCurrency(summary.gananciasTotalesUsdt || 0)}
+                    {formatCurrency(summary.gananciaRealUsdt ?? 0)}
                   </h3>
+                  <p className="text-xs text-muted-foreground mt-1">Solo ciclos cerrados</p>
                 </div>
                 <div className="p-3 bg-success/10 rounded-xl">
-                  <TrendingUp className="w-5 h-5 text-success" />
+                  <CheckCircle2 className="w-5 h-5 text-success" />
                 </div>
               </div>
             </div>
@@ -78,13 +77,14 @@ export default function Dashboard() {
             <div className="glass-panel p-6 rounded-2xl">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Volumen Operado</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">G. Proyectada USDT</p>
                   <h3 className="text-3xl font-display font-bold text-foreground">
-                    {formatCurrency(summary.montoBrutoTotal || 0)}
+                    {formatCurrency(summary.gananciasTotalesUsdt ?? 0)}
                   </h3>
+                  <p className="text-xs text-muted-foreground mt-1">Todas las operaciones</p>
                 </div>
                 <div className="p-3 bg-primary/10 rounded-xl">
-                  <Activity className="w-5 h-5 text-primary" />
+                  <TrendingUp className="w-5 h-5 text-primary" />
                 </div>
               </div>
             </div>
@@ -92,28 +92,29 @@ export default function Dashboard() {
             <div className="glass-panel p-6 rounded-2xl">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Comisiones Totales</p>
-                  <h3 className="text-3xl font-display font-bold text-danger">
-                    {formatCurrency(
-                      (summary.comisionesTotales?.banco || 0) +
-                        (summary.comisionesTotales?.binance || 0) +
-                        (summary.comisionesTotales?.servidor || 0)
-                    )}
-                  </h3>
-                </div>
-                <div className="p-3 bg-danger/10 rounded-xl">
-                  <ArrowDownRight className="w-5 h-5 text-danger" />
-                </div>
-              </div>
-            </div>
-
-            <div className="glass-panel p-6 rounded-2xl">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Total Operaciones</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Volumen Operado</p>
                   <h3 className="text-3xl font-display font-bold text-foreground">
-                    {summary.totalOperaciones || 0}
+                    {formatCurrency(summary.montoBrutoTotal ?? 0)}
                   </h3>
+                  <p className="text-xs text-muted-foreground mt-1">USDT total</p>
+                </div>
+                <div className="p-3 bg-secondary rounded-xl">
+                  <Activity className="w-5 h-5 text-foreground" />
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-panel p-6 rounded-2xl">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Operaciones</p>
+                  <h3 className="text-3xl font-display font-bold text-foreground">
+                    {summary.totalOperaciones ?? 0}
+                  </h3>
+                  <div className="flex gap-2 mt-1">
+                    <span className="text-xs text-yellow-400">🟡 {summary.operacionesAbiertas ?? 0} abiertas</span>
+                    <span className="text-xs text-success">🟢 {summary.operacionesCerradas ?? 0} cerradas</span>
+                  </div>
                 </div>
                 <div className="p-3 bg-secondary rounded-xl">
                   <Wallet className="w-5 h-5 text-foreground" />
@@ -123,55 +124,52 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="glass-panel p-6 rounded-2xl lg:col-span-1">
+            {/* Ganancias por moneda */}
+            <div className="glass-panel p-6 rounded-2xl">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Landmark className="w-5 h-5 text-primary" /> Ganancias por Moneda
+                <Landmark className="w-5 h-5 text-primary" /> Ganancias Proyectadas por Moneda
               </h3>
-              <div className="space-y-4">
-                {Object.entries(summary.gananciasNetas || {}).map(([moneda, valor]) => (
-                  <div
-                    key={moneda}
-                    className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5"
-                  >
-                    <span className="font-medium text-muted-foreground">{moneda}</span>
-                    <span className={`font-bold ${(valor as number) >= 0 ? "text-success" : "text-danger"}`}>
-                      {formatCurrency(valor as number, moneda)}
-                    </span>
-                  </div>
-                ))}
-                {Object.keys(summary.gananciasNetas || {}).length === 0 && (
+              <div className="space-y-3">
+                {Object.entries(summary.gananciasNetas ?? {})
+                  .filter(([, val]) => (val as number) !== 0)
+                  .map(([moneda, valor]) => (
+                    <div key={moneda} className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
+                      <span className="font-medium text-muted-foreground">{moneda}</span>
+                      <span className={`font-bold ${(valor as number) >= 0 ? "text-success" : "text-danger"}`}>
+                        {formatCurrency(valor as number, moneda)}
+                      </span>
+                    </div>
+                  ))}
+                {Object.values(summary.gananciasNetas ?? {}).every((v) => v === 0) && (
                   <p className="text-muted-foreground text-sm text-center py-4">Sin datos</p>
                 )}
               </div>
             </div>
 
+            {/* Volumen por plataforma */}
             <div className="glass-panel p-6 rounded-2xl lg:col-span-2">
               <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                 <Activity className="w-5 h-5 text-primary" /> Volumen por Plataforma
               </h3>
               {volumenData.length === 0 ? (
-                <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
+                <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">
                   Sin operaciones en esta fecha
                 </div>
               ) : (
-                <div className="flex items-end gap-3 h-[220px] px-2">
+                <div className="flex items-end gap-3 h-[200px] px-2">
                   {volumenData.map((entry, index) => {
                     const pct = maxVolumen > 0 ? (entry.volumen / maxVolumen) * 100 : 0;
                     const colors = ["#0ea5e9", "#10b981", "#a855f7", "#f59e0b", "#ef4444", "#06b6d4"];
                     const color = colors[index % colors.length];
                     return (
                       <div key={entry.plataforma} className="flex flex-col items-center flex-1 gap-1">
-                        <span className="text-xs text-muted-foreground font-medium">
-                          {formatCurrency(entry.volumen)}
-                        </span>
+                        <span className="text-xs text-muted-foreground font-medium">{formatCurrency(entry.volumen)}</span>
                         <div className="w-full rounded-t-lg transition-all" style={{
-                          height: `${Math.max(pct * 1.7, 8)}px`,
+                          height: `${Math.max(pct * 1.6, 8)}px`,
                           backgroundColor: color,
                           minHeight: "8px",
                         }} />
-                        <span className="text-xs text-muted-foreground truncate w-full text-center">
-                          {entry.plataforma}
-                        </span>
+                        <span className="text-xs text-muted-foreground truncate w-full text-center">{entry.plataforma}</span>
                       </div>
                     );
                   })}
@@ -179,7 +177,39 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="glass-panel p-6 rounded-2xl lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Comisiones */}
+            <div className="glass-panel p-6 rounded-2xl">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <ArrowDownRight className="w-5 h-5 text-danger" /> Comisiones Totales
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between p-3 bg-white/5 rounded-xl">
+                  <span className="text-muted-foreground text-sm">Banco / Transferencia</span>
+                  <span className="text-danger font-medium">{formatCurrency(summary.comisionesTotales?.banco ?? 0)}</span>
+                </div>
+                <div className="flex justify-between p-3 bg-white/5 rounded-xl">
+                  <span className="text-muted-foreground text-sm">Binance</span>
+                  <span className="text-danger font-medium">{formatCurrency(summary.comisionesTotales?.binance ?? 0)}</span>
+                </div>
+                <div className="flex justify-between p-3 bg-white/5 rounded-xl">
+                  <span className="text-muted-foreground text-sm">Servidor</span>
+                  <span className="text-danger font-medium">{formatCurrency(summary.comisionesTotales?.servidor ?? 0)}</span>
+                </div>
+                <div className="flex justify-between p-3 bg-danger/5 rounded-xl border border-danger/20">
+                  <span className="font-medium text-sm">Total Comisiones</span>
+                  <span className="text-danger font-bold">
+                    {formatCurrency(
+                      (summary.comisionesTotales?.banco ?? 0) +
+                      (summary.comisionesTotales?.binance ?? 0) +
+                      (summary.comisionesTotales?.servidor ?? 0)
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mejor y última operación */}
+            <div className="glass-panel p-6 rounded-2xl lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="p-4 bg-success/5 border border-success/20 rounded-xl">
                 <h4 className="text-sm font-medium text-success mb-2 flex items-center gap-2">
                   <ArrowUpRight className="w-4 h-4" /> Operación Más Rentable
@@ -187,38 +217,29 @@ export default function Dashboard() {
                 {summary.operacionMasRentable ? (
                   <div>
                     <p className="text-2xl font-bold text-foreground mb-1">
-                      {formatCurrency(summary.operacionMasRentable.gananciaNetaUsdt)}
+                      {formatCurrency(summary.operacionMasRentable.gananciaNetaUsdt)} USDT
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {summary.operacionMasRentable.plataformaOrigen} →{" "}
-                      {summary.operacionMasRentable.plataformaDestino} (
-                      {summary.operacionMasRentable.moneda})
+                      {summary.operacionMasRentable.plataformaOrigen} → {summary.operacionMasRentable.plataformaDestino} ({summary.operacionMasRentable.moneda})
                     </p>
                   </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">Sin datos</p>
-                )}
+                ) : <p className="text-muted-foreground text-sm">Sin datos</p>}
               </div>
 
               <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
                 <h4 className="text-sm font-medium text-primary mb-2 flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> Última Operación Registrada
+                  <Clock className="w-4 h-4" /> Última Operación
                 </h4>
                 {summary.operacionMasLarga ? (
                   <div>
                     <p className="text-2xl font-bold text-foreground mb-1">
-                      {formatCurrency(
-                        summary.operacionMasLarga.montoBruto,
-                        summary.operacionMasLarga.moneda
-                      )}
+                      {formatCurrency(summary.operacionMasLarga.montoBruto)} USDT
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Hace momentos • {summary.operacionMasLarga.plataformaOrigen}
+                      {summary.operacionMasLarga.plataformaOrigen} • {summary.operacionMasLarga.moneda}
                     </p>
                   </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">Sin datos</p>
-                )}
+                ) : <p className="text-muted-foreground text-sm">Sin datos</p>}
               </div>
             </div>
           </div>

@@ -125,6 +125,7 @@ export const GetOperationsResponseItem = zod.object({
   moneda: zod.enum(["PAB", "USD", "VES", "COP"]),
   tasaDeCambio: zod.number(),
   plataformaOrigen: zod.string(),
+  plataformaIntermediaria: zod.string().nullable().optional(),
   plataformaDestino: zod.string(),
   montoBruto: zod.number(),
   comisionBanco: zod.number(),
@@ -133,6 +134,9 @@ export const GetOperationsResponseItem = zod.object({
   comisionServidorEnUsdt: zod.boolean(),
   gananciaNeta: zod.number(),
   gananciaNetaUsdt: zod.number(),
+  statusCiclo: zod.enum(["abierta", "cerrada"]).optional(),
+  montoFinalUsdt: zod.number().nullable().optional(),
+  gananciaRealUsdt: zod.number().nullable().optional(),
   notas: zod.string().optional(),
   receipts: zod
     .array(
@@ -154,10 +158,11 @@ export const GetOperationsResponse = zod.array(GetOperationsResponseItem);
  * @summary Create a new operation
  */
 export const CreateOperationBody = zod.object({
-  fecha: zod.date(),
+  fecha: zod.string(),
   moneda: zod.enum(["PAB", "USD", "VES", "COP"]),
   tasaDeCambio: zod.number(),
   plataformaOrigen: zod.string(),
+  plataformaIntermediaria: zod.string().optional(),
   plataformaDestino: zod.string(),
   montoBruto: zod.number(),
   comisionBanco: zod.number(),
@@ -181,6 +186,7 @@ export const GetOperationResponse = zod.object({
   moneda: zod.enum(["PAB", "USD", "VES", "COP"]),
   tasaDeCambio: zod.number(),
   plataformaOrigen: zod.string(),
+  plataformaIntermediaria: zod.string().nullable().optional(),
   plataformaDestino: zod.string(),
   montoBruto: zod.number(),
   comisionBanco: zod.number(),
@@ -189,6 +195,9 @@ export const GetOperationResponse = zod.object({
   comisionServidorEnUsdt: zod.boolean(),
   gananciaNeta: zod.number(),
   gananciaNetaUsdt: zod.number(),
+  statusCiclo: zod.enum(["abierta", "cerrada"]).optional(),
+  montoFinalUsdt: zod.number().nullable().optional(),
+  gananciaRealUsdt: zod.number().nullable().optional(),
   notas: zod.string().optional(),
   receipts: zod
     .array(
@@ -213,10 +222,11 @@ export const UpdateOperationParams = zod.object({
 });
 
 export const UpdateOperationBody = zod.object({
-  fecha: zod.date(),
+  fecha: zod.string(),
   moneda: zod.enum(["PAB", "USD", "VES", "COP"]),
   tasaDeCambio: zod.number(),
   plataformaOrigen: zod.string(),
+  plataformaIntermediaria: zod.string().optional(),
   plataformaDestino: zod.string(),
   montoBruto: zod.number(),
   comisionBanco: zod.number(),
@@ -233,6 +243,7 @@ export const UpdateOperationResponse = zod.object({
   moneda: zod.enum(["PAB", "USD", "VES", "COP"]),
   tasaDeCambio: zod.number(),
   plataformaOrigen: zod.string(),
+  plataformaIntermediaria: zod.string().nullable().optional(),
   plataformaDestino: zod.string(),
   montoBruto: zod.number(),
   comisionBanco: zod.number(),
@@ -241,6 +252,9 @@ export const UpdateOperationResponse = zod.object({
   comisionServidorEnUsdt: zod.boolean(),
   gananciaNeta: zod.number(),
   gananciaNetaUsdt: zod.number(),
+  statusCiclo: zod.enum(["abierta", "cerrada"]).optional(),
+  montoFinalUsdt: zod.number().nullable().optional(),
+  gananciaRealUsdt: zod.number().nullable().optional(),
   notas: zod.string().optional(),
   receipts: zod
     .array(
@@ -547,4 +561,34 @@ export const GetOperationsReportResponse = zod.object({
       createdAt: zod.date(),
     }),
   ),
+});
+
+/**
+ * @summary Cerrar ciclo - register final USDT received
+ */
+export const CerrarCicloParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CerrarCicloBody = zod.object({
+  montoFinalUsdt: zod.number(),
+});
+
+export const CerrarCicloResponse = zod.object({
+  id: zod.number(),
+  statusCiclo: zod.enum(["abierta", "cerrada"]),
+  montoFinalUsdt: zod.number().nullable().optional(),
+  gananciaRealUsdt: zod.number().nullable().optional(),
+});
+
+/**
+ * @summary Delete a distribution report
+ */
+export const DeleteDistributionReportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteDistributionReportResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string().optional(),
 });

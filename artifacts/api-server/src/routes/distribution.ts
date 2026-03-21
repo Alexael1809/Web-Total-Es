@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { distributionReportsTable } from "@workspace/db/schema";
 import { CalculateDistributionBody, SaveDistributionReportBody } from "@workspace/api-zod";
 import { authenticate, requireAdmin } from "../middlewares/auth.js";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -34,13 +35,7 @@ router.post("/calculate", authenticate, requireAdmin, async (req, res) => {
     };
   });
 
-  res.json({
-    gananciaNeta,
-    feeOperador,
-    fondoRestante,
-    poolTotal,
-    distribuciones,
-  });
+  res.json({ gananciaNeta, feeOperador, fondoRestante, poolTotal, distribuciones });
 });
 
 router.get("/reports", authenticate, async (_req, res) => {
@@ -59,6 +54,12 @@ router.post("/reports", authenticate, requireAdmin, async (req, res) => {
     resultado: parsed.data.resultado,
   }).returning();
   res.status(201).json(report);
+});
+
+router.delete("/reports/:id", authenticate, requireAdmin, async (req, res) => {
+  const id = parseInt(req.params.id);
+  await db.delete(distributionReportsTable).where(eq(distributionReportsTable.id, id));
+  res.json({ success: true, message: "Reporte eliminado" });
 });
 
 export default router;

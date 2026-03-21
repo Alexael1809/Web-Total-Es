@@ -51,9 +51,23 @@ artifacts-monorepo/
 
 - `users` — Admin and Socio users
 - `payment_methods` — Configurable payment platforms (Zinli, Facebank, etc.)
-- `operations` — P2P arbitrage operations with auto-calculated net profit
+- `operations` — P2P arbitrage operations; has `status_ciclo` (abierta/cerrada), `plataforma_intermediaria`, `monto_final_usdt`, `ganancia_real_usdt`
 - `receipts` — Payment proof screenshots linked to operations
 - `distribution_reports` — Saved capital distribution calculations
+
+## Key Formulas
+
+- `tasa_de_cambio` = spread multiplier (e.g. 1.08 = 8% profit)
+- `ganancia_bruta_usdt = monto_bruto × (tasa - 1)`
+- All 3 commissions (banco, binance, servidor) are in USDT
+- `ganancia_neta_usdt = ganancia_bruta - comBanco - comBinance - comServidor`
+- Cerrar Ciclo: `ganancia_real_usdt = monto_final_usdt - monto_bruto`
+
+## Test Data (Seed)
+
+- 6 operations: 4 cerradas + 2 abiertas
+- Extra socio: `carlos.socio@demo.com` / `Socio_2025$`
+- 7 payment methods: Binance, Zinli, Wise, PayPal, Pago Móvil, Reserve, Zelle
 
 ## API Endpoints
 

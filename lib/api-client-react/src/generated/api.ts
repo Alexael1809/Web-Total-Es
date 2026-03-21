@@ -1731,3 +1731,67 @@ export function useGetOperationsReport<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+// ─── Cerrar Ciclo ───────────────────────────────────────────────────────────
+
+export const cerrarCiclo = async (
+  id: number,
+  data: { montoFinalUsdt: number },
+  options?: RequestInit,
+): Promise<any> => {
+  return customFetch<any>(`/api/operations/${id}/cerrar-ciclo`, {
+    ...options,
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+};
+
+export const useCerrarCiclo = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cerrarCiclo>>,
+    TError,
+    { id: number; data: { montoFinalUsdt: number } },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cerrarCiclo>>,
+  TError,
+  { id: number; data: { montoFinalUsdt: number } },
+  TContext
+> => {
+  const mutationFn = async (vars: { id: number; data: { montoFinalUsdt: number } }) => {
+    return cerrarCiclo(vars.id, vars.data);
+  };
+  return useMutation({ mutationFn, ...options?.mutation });
+};
+
+// ─── Delete Distribution Report ─────────────────────────────────────────────
+
+export const deleteDistributionReport = async (
+  id: number,
+  options?: RequestInit,
+): Promise<{ success: boolean; message?: string }> => {
+  return customFetch<{ success: boolean; message?: string }>(
+    `/api/distribution/reports/${id}`,
+    { ...options, method: "DELETE" },
+  );
+};
+
+export const useDeleteDistributionReport = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDistributionReport>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteDistributionReport>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationFn = async (vars: { id: number }) => {
+    return deleteDistributionReport(vars.id);
+  };
+  return useMutation({ mutationFn, ...options?.mutation });
+};

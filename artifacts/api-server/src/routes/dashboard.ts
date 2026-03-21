@@ -30,10 +30,13 @@ router.get("/summary", authenticate, async (req, res) => {
 
   const ops = await db.select().from(operationsTable).where(and(...conditions));
 
-  const gananciasNetas = { PAB: 0, USD: 0, VES: 0, COP: 0 };
+  const gananciasNetas: Record<string, number> = { PAB: 0, USD: 0, VES: 0, COP: 0 };
   const comisionesTotales = { banco: 0, binance: 0, servidor: 0 };
-  let gananciasTotalesUsdt = 0;
+  let gananciasTotalesUsdt = 0;  // projected (all operations)
+  let gananciaRealUsdt = 0;      // real (only closed operations)
   let montoBrutoTotal = 0;
+  let operacionesAbiertas = 0;
+  let operacionesCerradas = 0;
 
   const plataformaMap: Record<string, { volumen: number; operaciones: number }> = {};
 
@@ -48,14 +51,22 @@ router.get("/summary", authenticate, async (req, res) => {
     const cbin = parseFloat(op.comisionBinance as any);
     const cs = parseFloat(op.comisionServidor as any);
 
-    gananciasNetas[op.moneda as keyof typeof gananciasNetas] += gn;
+    gananciasNetas[op.moneda] = (gananciasNetas[op.moneda] || 0) + gn;
     gananciasTotalesUsdt += gnUsdt;
     montoBrutoTotal += mb;
     comisionesTotales.banco += cb;
     comisionesTotales.binance += cbin;
     comisionesTotales.servidor += cs;
 
-    const plataforma = `${op.plataformaOrigen}→${op.plataformaDestino}`;
+    if (op.statusCiclo === "abierta") {
+      operacionesAbiertas += 1;
+    } else {
+      operacionesCerradas += 1;
+      if (op.gananciaRealUsdt != null) {
+        gananciaRealUsdt += parseFloat(op.gananciaRealUsdt as any);
+      }
+    }
+
     if (!plataformaMap[op.plataformaOrigen]) {
       plataformaMap[op.plataformaOrigen] = { volumen: 0, operaciones: 0 };
     }
@@ -65,7 +76,7 @@ router.get("/summary", authenticate, async (req, res) => {
     if (!masRentable || gnUsdt > parseFloat(masRentable.gananciaNetaUsdt)) {
       masRentable = op;
     }
-    if (!masLarga || new Date(op.createdAt).getTime() - new Date(op.fecha).getTime() > new Date(masLarga.createdAt).getTime() - new Date(masLarga.fecha).getTime()) {
+    if (!masLarga || new Date(op.createdAt).getTime() > new Date(masLarga.createdAt).getTime()) {
       masLarga = op;
     }
   }
@@ -84,17 +95,22 @@ router.get("/summary", authenticate, async (req, res) => {
     comisionServidor: parseFloat(op.comisionServidor),
     gananciaNeta: parseFloat(op.gananciaNeta),
     gananciaNetaUsdt: parseFloat(op.gananciaNetaUsdt),
+    montoFinalUsdt: op.montoFinalUsdt != null ? parseFloat(op.montoFinalUsdt) : null,
+    gananciaRealUsdt: op.gananciaRealUsdt != null ? parseFloat(op.gananciaRealUsdt) : null,
     receipts: [],
   } : null;
 
   res.json({
     gananciasNetas,
     gananciasTotalesUsdt,
+    gananciaRealUsdt,
     comisionesTotales,
     operacionMasRentable: formatOp(masRentable),
     operacionMasLarga: formatOp(masLarga),
     volumenPorPlataforma,
     totalOperaciones: ops.length,
+    operacionesAbiertas,
+    operacionesCerradas,
     montoBrutoTotal,
   });
 });
