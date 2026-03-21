@@ -15,8 +15,10 @@ const router = Router();
 // montoBruto is in USDT; all commissions in USDT
 const CreateOperationBody = z.object({
   fecha: z.string().min(1),
-  moneda: z.enum(["PAB", "USD", "VES", "COP"]),
+  moneda: z.string().min(1),
   tasaDeCambio: z.coerce.number().min(1, "Tasa inválida"),
+  tasaCompra: z.coerce.number().optional(),
+  tasaVenta: z.coerce.number().optional(),
   plataformaOrigen: z.string().min(1),
   plataformaIntermediaria: z.string().optional(),
   plataformaDestino: z.string().min(1),
@@ -65,6 +67,8 @@ function formatOperation(op: any, receipts: any[]) {
   return {
     ...op,
     tasaDeCambio: parseFloat(op.tasaDeCambio),
+    tasaCompra: op.tasaCompra != null ? parseFloat(op.tasaCompra) : null,
+    tasaVenta: op.tasaVenta != null ? parseFloat(op.tasaVenta) : null,
     montoBruto: parseFloat(op.montoBruto),
     comisionBanco: parseFloat(op.comisionBanco),
     comisionBinance: parseFloat(op.comisionBinance),
@@ -137,6 +141,8 @@ router.post("/", authenticate, async (req, res) => {
     fecha: new Date(data.fecha),
     moneda: data.moneda,
     tasaDeCambio: tasaDeCambio.toString(),
+    tasaCompra: data.tasaCompra != null ? data.tasaCompra.toString() : null,
+    tasaVenta: data.tasaVenta != null ? data.tasaVenta.toString() : null,
     plataformaOrigen: data.plataformaOrigen,
     plataformaIntermediaria: data.plataformaIntermediaria || null,
     plataformaDestino: data.plataformaDestino,

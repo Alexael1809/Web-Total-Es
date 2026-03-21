@@ -1732,6 +1732,102 @@ export function useGetOperationsReport<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
+// ─── Currencies ──────────────────────────────────────────────────────────────
+
+export interface CurrencyItem {
+  id: number;
+  code: string;
+  name: string;
+  symbol: string;
+  createdAt: string;
+}
+
+export const getCurrencies = async (options?: RequestInit): Promise<CurrencyItem[]> => {
+  return customFetch<CurrencyItem[]>(`/api/currencies`, { ...options, method: "GET" });
+};
+
+export const getGetCurrenciesQueryKey = () => [`/api/currencies`] as const;
+
+export const getGetCurrenciesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCurrencies>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getCurrencies>>, TError, TData>;
+}) => {
+  const { query: queryOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetCurrenciesQueryKey();
+  const queryFn = ({ signal }: { signal?: AbortSignal }) => getCurrencies({ signal });
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCurrencies>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export function useGetCurrencies<
+  TData = Awaited<ReturnType<typeof getCurrencies>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getCurrencies>>, TError, TData>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCurrenciesQueryOptions(options);
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const createCurrency = async (
+  data: { code: string; name: string; symbol?: string },
+  options?: RequestInit,
+): Promise<CurrencyItem> => {
+  return customFetch<CurrencyItem>(`/api/currencies`, {
+    ...options,
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+};
+
+export const useCreateCurrency = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCurrency>>,
+    TError,
+    { data: { code: string; name: string; symbol?: string } },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createCurrency>>,
+  TError,
+  { data: { code: string; name: string; symbol?: string } },
+  TContext
+> => {
+  const mutationFn = async (vars: { data: { code: string; name: string; symbol?: string } }) =>
+    createCurrency(vars.data);
+  return useMutation({ mutationFn, ...options?.mutation });
+};
+
+export const deleteCurrency = async (id: number, options?: RequestInit): Promise<{ success: boolean }> => {
+  return customFetch<{ success: boolean }>(`/api/currencies/${id}`, {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const useDeleteCurrency = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCurrency>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteCurrency>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationFn = async (vars: { id: number }) => deleteCurrency(vars.id);
+  return useMutation({ mutationFn, ...options?.mutation });
+};
+
 // ─── Cerrar Ciclo ───────────────────────────────────────────────────────────
 
 export const cerrarCiclo = async (

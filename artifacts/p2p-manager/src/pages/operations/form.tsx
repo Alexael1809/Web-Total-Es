@@ -1,19 +1,23 @@
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCreateOperation, useGetPaymentMethods } from "@workspace/api-client-react";
+import { useCreateOperation, useGetPaymentMethods, useGetCurrencies } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { Calculator, ArrowLeft, Save, Loader2, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 
+type TasaMode = "multiplicador" | "porcentaje" | "tipoCambio";
+
 const operationSchema = z.object({
   fecha: z.string().min(1, "Requerido"),
-  moneda: z.enum(["PAB", "USD", "VES", "COP"]),
+  moneda: z.string().min(1, "Requerido"),
   tasaInput: z.coerce.number().min(0.000001, "Valor inválido"),
-  tasaEnPorcentaje: z.boolean().default(false),
+  tasaMode: z.enum(["multiplicador", "porcentaje", "tipoCambio"]).default("multiplicador"),
+  tasaCompra: z.coerce.number().optional(),
+  tasaVenta: z.coerce.number().optional(),
   plataformaOrigen: z.string().min(1, "Requerido"),
   plataformaIntermediaria: z.string().optional(),
   plataformaDestino: z.string().min(1, "Requerido"),
@@ -31,6 +35,11 @@ export default function OperationForm() {
   const queryClient = useQueryClient();
   const createMutation = useCreateOperation();
   const { data: platforms } = useGetPaymentMethods();
+  const { data: currencies } = useGetCurrencies();
+
+  const [tasaMode, setTasaMode] = useState<TasaMode>("multiplicador");
+  const [tasaCompra, setTasaCompra] = useState<string>("540");
+  const [tasaVenta, setTasaVenta] = useState<string>("560");
 
   const {
     register,
@@ -44,7 +53,7 @@ export default function OperationForm() {
       fecha: new Date().toISOString().slice(0, 16),
       moneda: "VES",
       tasaInput: 1.08,
-      tasaEnPorcentaje: false,
+      tasaMode: "multiplicador",
       montoBruto: 100,
       comisionBanco: 0,
       comisionBinance: 0,
@@ -56,9 +65,19 @@ export default function OperationForm() {
   });
 
   const formValues = watch();
-  const tasaInput = Number(formValues.tasaInput) || 0;
-  const esPorc = Boolean(formValues.tasaEnPorcentaje);
-  const spreadMultiplier = esPorc ? 1 + tasaInput / 100 : tasaInput;
+  const rawTasaInput = Number(formValues.tasaInput) || 0;
+  const compra = parseFloat(tasaCompra) || 0;
+  const venta = parseFloat(tasaVenta) || 0;
+
+  let spreadMultiplier = 1;
+  if (tasaMode === "multiplicador") {
+    spreadMultiplier = rawTasaInput;
+  } else if (tasaMode === "porcentaje") {
+    spreadMultiplier = 1 + rawTasaInput / 100;
+  } else {
+    spreadMultiplier = compra > 0 && venta > 0 ? venta / compra : 1;
+  }
+
   const bruto = Number(formValues.montoBruto) || 0;
   const comBanco = Number(formValues.comisionBanco) || 0;
   const comBin = Number(formValues.comisionBinance) || 0;
@@ -66,14 +85,28 @@ export default function OperationForm() {
   const gananciaBruta = bruto * Math.max(spreadMultiplier - 1, 0);
   const netUsdt = gananciaBruta - comBanco - comBin - comServ;
 
+  const handleSetMode = (mode: TasaMode) => {
+    setTasaMode(mode);
+    setValue("tasaMode", mode);
+    if (mode === "multiplicador") setValue("tasaInput", 1.08);
+    else if (mode === "porcentaje") setValue("tasaInput", 8);
+    else setValue("tasaInput", 1);
+  };
+
   const onSubmit = async (data: OperationFormType) => {
-    const mult = data.tasaEnPorcentaje ? 1 + data.tasaInput / 100 : data.tasaInput;
+    let mult = spreadMultiplier;
+    if (tasaMode === "multiplicador") mult = rawTasaInput;
+    else if (tasaMode === "porcentaje") mult = 1 + rawTasaInput / 100;
+    else mult = compra > 0 && venta > 0 ? venta / compra : 1;
+
     try {
       await createMutation.mutateAsync({
         data: {
           fecha: new Date(data.fecha).toISOString(),
           moneda: data.moneda,
           tasaDeCambio: mult,
+          tasaCompra: tasaMode === "tipoCambio" && compra > 0 ? compra : undefined,
+          tasaVenta: tasaMode === "tipoCambio" && venta > 0 ? venta : undefined,
           plataformaOrigen: data.plataformaOrigen,
           plataformaIntermediaria: data.plataformaIntermediaria || undefined,
           plataformaDestino: data.plataformaDestino,
@@ -103,6 +136,12 @@ export default function OperationForm() {
     "PayPal",
     "Pago Móvil",
   ].filter((v, i, arr) => arr.indexOf(v) === i);
+
+  const modeLabel: Record<TasaMode, string> = {
+    multiplicador: "Tasa Directa (×)",
+    porcentaje: "Spread %",
+    tipoCambio: "Tipo de Cambio",
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -138,10 +177,18 @@ export default function OperationForm() {
                   {...register("moneda")}
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-foreground focus:outline-none focus:border-primary appearance-none"
                 >
-                  <option value="VES">VES (Bolívares)</option>
-                  <option value="COP">COP (Pesos Col.)</option>
-                  <option value="PAB">PAB (Balboas/USD)</option>
-                  <option value="USD">USD (Dólares)</option>
+                  {currencies && currencies.length > 0 ? (
+                    currencies.map(c => (
+                      <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="VES">VES — Bolívares</option>
+                      <option value="COP">COP — Pesos Colombianos</option>
+                      <option value="PAB">PAB — Balboas / USD</option>
+                      <option value="USD">USD — Dólares</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -156,42 +203,80 @@ export default function OperationForm() {
                 />
               </div>
 
-              {/* Tasa/Spread con toggle */}
+              {/* Tasa/Spread con toggle de 3 modos */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-sm font-medium text-muted-foreground">
-                    {esPorc ? "Spread %" : "Tasa Directa (×)"}
-                  </label>
+                  <label className="text-sm font-medium text-muted-foreground">{modeLabel[tasaMode]}</label>
                   <div className="flex items-center bg-black/30 border border-white/10 rounded-lg p-0.5 text-xs">
                     <button
                       type="button"
-                      onClick={() => setValue("tasaEnPorcentaje", false)}
-                      className={`px-2.5 py-1 rounded-md transition-colors ${!esPorc ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => handleSetMode("multiplicador")}
+                      className={`px-2.5 py-1 rounded-md transition-colors ${tasaMode === "multiplicador" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       ×Tasa
                     </button>
                     <button
                       type="button"
-                      onClick={() => setValue("tasaEnPorcentaje", true)}
-                      className={`px-2.5 py-1 rounded-md transition-colors ${esPorc ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => handleSetMode("porcentaje")}
+                      className={`px-2.5 py-1 rounded-md transition-colors ${tasaMode === "porcentaje" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       %
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetMode("tipoCambio")}
+                      className={`px-2.5 py-1 rounded-md transition-colors ${tasaMode === "tipoCambio" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      T/C
+                    </button>
                   </div>
                 </div>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="any"
-                    {...register("tasaInput")}
-                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 pr-10 text-foreground focus:outline-none focus:border-primary"
-                    placeholder={esPorc ? "Ej: 8" : "Ej: 1.080"}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                    {esPorc ? "%" : "×"}
-                  </span>
-                </div>
-                {errors.tasaInput && <p className="text-danger text-xs mt-1">{errors.tasaInput.message}</p>}
+
+                {tasaMode !== "tipoCambio" ? (
+                  <>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="any"
+                        {...register("tasaInput")}
+                        className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 pr-10 text-foreground focus:outline-none focus:border-primary"
+                        placeholder={tasaMode === "porcentaje" ? "Ej: 8" : "Ej: 1.080"}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        {tasaMode === "porcentaje" ? "%" : "×"}
+                      </span>
+                    </div>
+                    {errors.tasaInput && <p className="text-danger text-xs mt-1">{errors.tasaInput.message}</p>}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs text-muted-foreground mb-1">Tasa Compra</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={tasaCompra}
+                          onChange={e => setTasaCompra(e.target.value)}
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm"
+                          placeholder="Ej: 540"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs text-muted-foreground mb-1">Tasa Venta</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={tasaVenta}
+                          onChange={e => setTasaVenta(e.target.value)}
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm"
+                          placeholder="Ej: 560"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-xs text-muted-foreground mt-1">
                   ={" "}×{spreadMultiplier.toFixed(6)} — spread {((spreadMultiplier - 1) * 100).toFixed(3)}%
                 </p>
@@ -293,6 +378,23 @@ export default function OperationForm() {
             <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
               <Calculator className="w-5 h-5 text-primary" /> Proyección
             </h3>
+
+            {tasaMode === "tipoCambio" && compra > 0 && venta > 0 && (
+              <div className="bg-white/5 rounded-xl p-3 text-xs space-y-1">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Compra</span>
+                  <span className="font-mono">{compra.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Venta</span>
+                  <span className="font-mono">{venta.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-primary font-medium pt-1 border-t border-white/10">
+                  <span>Multiplicador</span>
+                  <span className="font-mono">×{spreadMultiplier.toFixed(6)}</span>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
