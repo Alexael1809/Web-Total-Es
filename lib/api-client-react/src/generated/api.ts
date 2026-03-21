@@ -1828,6 +1828,33 @@ export const useDeleteCurrency = <TError = ErrorType<unknown>, TContext = unknow
   return useMutation({ mutationFn, ...options?.mutation });
 };
 
+// ─── Delete Receipt ──────────────────────────────────────────────────────────
+
+export const deleteReceipt = async (operationId: number, receiptId: number, options?: RequestInit): Promise<{ success: boolean }> => {
+  return customFetch<{ success: boolean }>(`/api/operations/${operationId}/receipts/${receiptId}`, {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const useDeleteReceipt = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteReceipt>>,
+    TError,
+    { operationId: number; receiptId: number },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteReceipt>>,
+  TError,
+  { operationId: number; receiptId: number },
+  TContext
+> => {
+  const mutationFn = async (vars: { operationId: number; receiptId: number }) =>
+    deleteReceipt(vars.operationId, vars.receiptId);
+  return useMutation({ mutationFn, ...options?.mutation });
+};
+
 // ─── Cerrar Ciclo ───────────────────────────────────────────────────────────
 
 export const cerrarCiclo = async (

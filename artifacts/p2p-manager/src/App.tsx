@@ -10,6 +10,7 @@ import { Layout } from "@/components/layout";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import OperationsList from "@/pages/operations/index";
+import OperationDetail from "@/pages/operations/detail";
 import OperationForm from "@/pages/operations/form";
 import Distribution from "@/pages/distribution/index";
 import Reports from "@/pages/reports/index";
@@ -57,6 +58,10 @@ function Router() {
       
       <Route path="/operaciones/nueva">
         <ProtectedRoute component={OperationForm} />
+      </Route>
+      
+      <Route path="/operaciones/:id">
+        <ProtectedRoute component={OperationDetail} />
       </Route>
       
       <Route path="/operaciones">

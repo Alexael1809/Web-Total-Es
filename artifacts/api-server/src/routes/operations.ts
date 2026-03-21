@@ -259,4 +259,25 @@ router.post("/:id/receipts", authenticate, upload.single("file"), async (req, re
   res.status(201).json(receipt);
 });
 
+router.delete("/:id/receipts/:receiptId", authenticate, async (req, res) => {
+  const operationId = parseInt(req.params.id);
+  const receiptId = parseInt(req.params.receiptId);
+  
+  const [receipt] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receiptId));
+  if (!receipt || receipt.operationId !== operationId) {
+    res.status(404).json({ error: "not_found", message: "Recibo no encontrado" });
+    return;
+  }
+  
+  const filePath = path.resolve(uploadsDir, receipt.filename);
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (err) {
+    console.error("Error deleting file:", err);
+  }
+  
+  await db.delete(receiptsTable).where(eq(receiptsTable.id, receiptId));
+  res.json({ success: true, message: "Recibo eliminado" });
+});
+
 export default router;

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useGetOperations, useDeleteOperation, useCerrarCiclo } from "@workspace/api-client-react";
-import { Link } from "wouter";
-import { Plus, Trash2, FileText, ArrowRight, CheckCircle2, Clock, X, AlertTriangle } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Plus, Trash2, FileText, ArrowRight, CheckCircle2, Clock, X, AlertTriangle, Image as ImageIcon } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -122,6 +122,7 @@ function CerrarCicloModal({ operationId, montoBruto, onConfirm, onCancel, isPend
 }
 
 export default function OperationsList() {
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { data: operations, isLoading } = useGetOperations();
   const deleteMutation = useDeleteOperation();
@@ -212,17 +213,24 @@ export default function OperationsList() {
                   const isCerrada = (op as any).statusCiclo === "cerrada";
                   const gananciaReal = (op as any).gananciaRealUsdt;
                   return (
-                    <tr key={op.id} className="hover:bg-white/5 transition-colors group">
+                    <tr key={op.id} className="hover:bg-white/5 transition-colors group cursor-pointer" onClick={() => setLocation(`/operaciones/${op.id}`)}>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        {isCerrada ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20">
-                            <CheckCircle2 className="w-3 h-3" /> Cerrada
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
-                            <Clock className="w-3 h-3" /> Abierta
-                          </span>
-                        )}
+                        <div className="flex flex-col gap-2">
+                          {isCerrada ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20">
+                              <CheckCircle2 className="w-3 h-3" /> Cerrada
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                              <Clock className="w-3 h-3" /> Abierta
+                            </span>
+                          )}
+                          {(op as any).receipts && (op as any).receipts.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20 w-fit">
+                              <ImageIcon className="w-3 h-3" /> {(op as any).receipts.length}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm">{formatDate(String(op.fecha))}</td>
                       <td className="px-4 py-4 whitespace-nowrap">
