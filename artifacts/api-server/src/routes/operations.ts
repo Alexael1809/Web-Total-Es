@@ -4,11 +4,26 @@ import path from "path";
 import { db } from "@workspace/db";
 import { operationsTable, receiptsTable } from "@workspace/db/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
-import { CreateOperationBody, GetOperationsQueryParams } from "@workspace/api-zod";
+import { GetOperationsQueryParams } from "@workspace/api-zod";
+import { z } from "zod";
 import { authenticate } from "../middlewares/auth.js";
 import fs from "fs";
 
 const router = Router();
+
+const CreateOperationBody = z.object({
+  fecha: z.string().min(1),
+  moneda: z.enum(["PAB", "USD", "VES", "COP"]),
+  tasaDeCambio: z.coerce.number(),
+  plataformaOrigen: z.string().min(1),
+  plataformaDestino: z.string().min(1),
+  montoBruto: z.coerce.number(),
+  comisionBanco: z.coerce.number().default(0),
+  comisionBinance: z.coerce.number().default(0),
+  comisionServidor: z.coerce.number().default(0),
+  comisionServidorEnUsdt: z.boolean().default(false),
+  notas: z.string().optional(),
+});
 
 const uploadsDir = path.resolve(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
