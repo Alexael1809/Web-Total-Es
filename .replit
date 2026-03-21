@@ -27,3 +27,9 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+VITE_SUPABASE_URL = "https://owhdjqmefouaeomnucuq.supabase.co"
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY = "sb_publishable_0gy2J9gTUx1TC53-fjCB8Q_em_vW1jd"
