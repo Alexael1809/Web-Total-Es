@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: P2P Arbitrage Manager API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: operations
+    description: P2P Operations CRUD
+  - name: payment-methods
+    description: Payment methods management
+  - name: distribution
+    description: Capital distribution calculator
+  - name: reports
+    description: Reports and analytics
+  - name: users
+    description: User management
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +35,428 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user info
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users:
+    get:
+      operationId: getUsers
+      tags: [users]
+      summary: Get all users (Admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete a user (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /payment-methods:
+    get:
+      operationId: getPaymentMethods
+      tags: [payment-methods]
+      summary: Get all payment methods
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of payment methods
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentMethod"
+    post:
+      operationId: createPaymentMethod
+      tags: [payment-methods]
+      summary: Create a payment method (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentMethodRequest"
+      responses:
+        "201":
+          description: Payment method created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentMethod"
+
+  /payment-methods/{id}:
+    delete:
+      operationId: deletePaymentMethod
+      tags: [payment-methods]
+      summary: Delete a payment method (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Payment method deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /operations:
+    get:
+      operationId: getOperations
+      tags: [operations]
+      summary: Get all operations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          schema:
+            type: string
+        - name: currency
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of operations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Operation"
+    post:
+      operationId: createOperation
+      tags: [operations]
+      summary: Create a new operation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOperationRequest"
+      responses:
+        "201":
+          description: Operation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+
+  /operations/{id}:
+    get:
+      operationId: getOperation
+      tags: [operations]
+      summary: Get operation by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Operation details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+    put:
+      operationId: updateOperation
+      tags: [operations]
+      summary: Update an operation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOperationRequest"
+      responses:
+        "200":
+          description: Operation updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+    delete:
+      operationId: deleteOperation
+      tags: [operations]
+      summary: Delete an operation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Operation deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /operations/{id}/receipts:
+    post:
+      operationId: uploadReceipt
+      tags: [operations]
+      summary: Upload a receipt for an operation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                type:
+                  type: string
+                  enum: [enviado, recibido]
+              required: [file, type]
+      responses:
+        "201":
+          description: Receipt uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Receipt"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [reports]
+      summary: Get dashboard summary for a specific date
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /distribution/calculate:
+    post:
+      operationId: calculateDistribution
+      tags: [distribution]
+      summary: Calculate capital distribution
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DistributionRequest"
+      responses:
+        "200":
+          description: Distribution result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionResult"
+
+  /distribution/reports:
+    get:
+      operationId: getDistributionReports
+      tags: [distribution]
+      summary: Get saved distribution reports
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of distribution reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DistributionReport"
+    post:
+      operationId: saveDistributionReport
+      tags: [distribution]
+      summary: Save a distribution report
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveDistributionReportRequest"
+      responses:
+        "201":
+          description: Report saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionReport"
+
+  /reports/operations:
+    get:
+      operationId: getOperationsReport
+      tags: [reports]
+      summary: Get operations grouped by currency for reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          schema:
+            type: string
+        - name: currency
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Operations report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationsReport"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +466,423 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - user
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, socio]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - name
+        - role
+        - createdAt
+
+    CreateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [admin, socio]
+      required:
+        - email
+        - name
+        - password
+        - role
+
+    PaymentMethod:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - createdAt
+
+    CreatePaymentMethodRequest:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+
+    Receipt:
+      type: object
+      properties:
+        id:
+          type: integer
+        operationId:
+          type: integer
+        filename:
+          type: string
+        url:
+          type: string
+        type:
+          type: string
+          enum: [enviado, recibido]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - operationId
+        - filename
+        - url
+        - type
+        - createdAt
+
+    Operation:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        fecha:
+          type: string
+          format: date-time
+        moneda:
+          type: string
+          enum: [PAB, USD, VES, COP]
+        tasaDeCambio:
+          type: number
+        plataformaOrigen:
+          type: string
+        plataformaDestino:
+          type: string
+        montoBruto:
+          type: number
+        comisionBanco:
+          type: number
+        comisionBinance:
+          type: number
+        comisionServidor:
+          type: number
+        comisionServidorEnUsdt:
+          type: boolean
+        gananciaNeta:
+          type: number
+        gananciaNetaUsdt:
+          type: number
+        notas:
+          type: string
+        receipts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Receipt"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - fecha
+        - moneda
+        - tasaDeCambio
+        - plataformaOrigen
+        - plataformaDestino
+        - montoBruto
+        - comisionBanco
+        - comisionBinance
+        - comisionServidor
+        - comisionServidorEnUsdt
+        - gananciaNeta
+        - gananciaNetaUsdt
+        - createdAt
+
+    CreateOperationRequest:
+      type: object
+      properties:
+        fecha:
+          type: string
+          format: date-time
+        moneda:
+          type: string
+          enum: [PAB, USD, VES, COP]
+        tasaDeCambio:
+          type: number
+        plataformaOrigen:
+          type: string
+        plataformaDestino:
+          type: string
+        montoBruto:
+          type: number
+        comisionBanco:
+          type: number
+        comisionBinance:
+          type: number
+        comisionServidor:
+          type: number
+        comisionServidorEnUsdt:
+          type: boolean
+        notas:
+          type: string
+      required:
+        - fecha
+        - moneda
+        - tasaDeCambio
+        - plataformaOrigen
+        - plataformaDestino
+        - montoBruto
+        - comisionBanco
+        - comisionBinance
+        - comisionServidor
+        - comisionServidorEnUsdt
+
+    DashboardSummary:
+      type: object
+      properties:
+        gananciasNetas:
+          type: object
+          properties:
+            PAB:
+              type: number
+            USD:
+              type: number
+            VES:
+              type: number
+            COP:
+              type: number
+          required: [PAB, USD, VES, COP]
+        gananciasTotalesUsdt:
+          type: number
+        comisionesTotales:
+          type: object
+          properties:
+            banco:
+              type: number
+            binance:
+              type: number
+            servidor:
+              type: number
+          required: [banco, binance, servidor]
+        operacionMasRentable:
+          $ref: "#/components/schemas/Operation"
+        operacionMasLarga:
+          $ref: "#/components/schemas/Operation"
+        volumenPorPlataforma:
+          type: array
+          items:
+            type: object
+            properties:
+              plataforma:
+                type: string
+              volumen:
+                type: number
+              operaciones:
+                type: integer
+            required: [plataforma, volumen, operaciones]
+        totalOperaciones:
+          type: integer
+        montoBrutoTotal:
+          type: number
+      required:
+        - gananciasNetas
+        - gananciasTotalesUsdt
+        - comisionesTotales
+        - volumenPorPlataforma
+        - totalOperaciones
+        - montoBrutoTotal
+
+    DistributionRequest:
+      type: object
+      properties:
+        gananciaNeta:
+          type: number
+        porcentajeOperador:
+          type: number
+        participantes:
+          type: array
+          items:
+            type: object
+            properties:
+              nombre:
+                type: string
+              capital:
+                type: number
+              esOperador:
+                type: boolean
+            required: [nombre, capital, esOperador]
+      required:
+        - gananciaNeta
+        - porcentajeOperador
+        - participantes
+
+    DistributionResult:
+      type: object
+      properties:
+        gananciaNeta:
+          type: number
+        feeOperador:
+          type: number
+        fondoRestante:
+          type: number
+        poolTotal:
+          type: number
+        distribuciones:
+          type: array
+          items:
+            type: object
+            properties:
+              nombre:
+                type: string
+              capital:
+                type: number
+              esOperador:
+                type: boolean
+              porcentaje:
+                type: number
+              gananciaCapital:
+                type: number
+              feeExtra:
+                type: number
+              totalRecibe:
+                type: number
+            required:
+              - nombre
+              - capital
+              - esOperador
+              - porcentaje
+              - gananciaCapital
+              - feeExtra
+              - totalRecibe
+      required:
+        - gananciaNeta
+        - feeOperador
+        - fondoRestante
+        - poolTotal
+        - distribuciones
+
+    SaveDistributionReportRequest:
+      type: object
+      properties:
+        titulo:
+          type: string
+        resultado:
+          $ref: "#/components/schemas/DistributionResult"
+      required:
+        - titulo
+        - resultado
+
+    DistributionReport:
+      type: object
+      properties:
+        id:
+          type: integer
+        titulo:
+          type: string
+        resultado:
+          $ref: "#/components/schemas/DistributionResult"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - titulo
+        - resultado
+        - createdAt
+
+    OperationsReport:
+      type: object
+      properties:
+        totalMontoBruto:
+          type: number
+        totalCantidadRecibida:
+          type: number
+        totalGananciaNeta:
+          type: number
+        porMoneda:
+          type: array
+          items:
+            type: object
+            properties:
+              moneda:
+                type: string
+              montoBruto:
+                type: number
+              cantidadRecibida:
+                type: number
+              gananciaNeta:
+                type: number
+              operaciones:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Operation"
+            required: [moneda, montoBruto, cantidadRecibida, gananciaNeta, operaciones]
+        operaciones:
+          type: array
+          items:
+            $ref: "#/components/schemas/Operation"
+      required:
+        - totalMontoBruto
+        - totalCantidadRecibida
+        - totalGananciaNeta
+        - porMoneda
+        - operaciones

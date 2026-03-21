@@ -1,0 +1,21 @@
+packages:
+  "framer-motion": "For page transitions and smooth UI animations"
+  "recharts": "For the dashboard analytics charts"
+  "date-fns": "For formatting and manipulating dates"
+  "xlsx": "For exporting reports to Excel files"
+  "clsx": "For merging tailwind classes safely"
+  "tailwind-merge": "For merging tailwind classes safely"
+  "react-hook-form": "For form state management and validation"
+  "@hookform/resolvers": "For zod validation integration with react-hook-form"
+
+images:
+  - path: "artifacts/p2p-manager/public/images/auth-bg.png"
+    description: "Dark, moody abstract financial background with glowing blue and green geometric lines representing data streams and blockchain"
+    aspect_ratio: "16:9"
+  - path: "artifacts/p2p-manager/public/images/logo.png"
+    description: "Minimalist modern logo for a financial arbitrage platform, utilizing a stylized infinity or exchange arrows symbol in neon electric blue and green on transparent background"
+    aspect_ratio: "1:1"
+
+notes:
+  - The JWT auth token is stored in localStorage as 'p2p_token' and injected globally via a fetch interceptor.
+  - The API structure is assumed directly from the provided OpenAPI spec.

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "P2P Arbitrage Manager"
+version = "1.0.0"
+id = "artifacts/p2p-manager"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26229
+
+[services.development]
+run = "pnpm --filter @workspace/p2p-manager run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/p2p-manager", "run", "build" ]
+publicDir = "artifacts/p2p-manager/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26229"
+BASE_PATH = "/"

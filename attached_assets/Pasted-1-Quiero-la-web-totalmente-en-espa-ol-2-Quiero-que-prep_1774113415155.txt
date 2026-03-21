@@ -1,0 +1,90 @@
+1) Quiero la web totalmente en español.
+
+2) Quiero que prepares el código de la plataforma porque te daré próximamente un PROMPT donde voy a migrar la base de datos a SUPERBASE y debes conectarla cuando te envie las indicaciones, no usare más la de replit, aprovechando eres libre de mejorar lo que consideres importante, los detalles también, agregar funciones nuevas que detecte que me hace falta agregar y que obviamente todo se complemente y funcione la plataforma perfectamente.
+
+Crea una aplicación web Full-Stack para gestión de arbitraje P2P y distribución de capitales.
+
+Stack Tecnológico Requerido:
+
+Frontend: React (Vite), Tailwind CSS, Shadcn UI (para componentes limpios y profesionales).
+
+Backend: Node.js con Express.
+
+Base de Datos: PostgreSQL.
+
+Autenticación: JWT con verificación OTP simulada o integrada mediante Nodemailer.
+
+Almacenamiento: Multer/almacenamiento local (para subir capturas de pantalla).
+
+1. Sistema de Autenticación y Roles (RBAC)
+
+Crea un Seed de Administrador: Email: alexaelperdomo1809@gmail.com / Password: Server_1005$.
+
+Rol Admin: Acceso CRUD total a operaciones, creación de usuarios "Socio" y visualización del panel general.
+
+Rol Socio: Dashboard de solo lectura para ver sus estadísticas personales y reportes de ganancias asignadas por el Admin.
+
+2. Módulo de Operaciones P2P (CRUD y Trazabilidad)
+
+Formulario de registro con los siguientes campos:
+
+Fecha y Hora.
+
+Moneda: Dropdown (PAB, USD, VES, COP).
+
+Tasa de cambio utilizada (Referencia a 1 USDT).
+
+Plataforma de Origen y Destino: Dropdown (Zinli, Facebank, Global66, Wise, Pago Móvil, Banco Local) quiero la opción de agregar, y eliminar los métodos de pagos.
+
+Monto Bruto Operado.
+
+Subida de Comprobantes: Zona Drag-and-Drop para adjuntar imágenes (capturas de pago). Deben estar taggeadas como "Enviado" o "Recibido" y vinculadas al ID de la operación para búsqueda rápida.
+
+3. Motor de Deducción de Comisiones (Lógica Exacta)
+El sistema debe calcular la "Ganancia Neta" restando 3 comisiones del spread bruto. Proporciona los siguientes inputs por operación:
+
+Comisión Banco: Input numérico (se asume en la moneda fiat seleccionada, ej. VES o USD).
+
+Comisión Binance: Input numérico (SIEMPRE se asume y resta en USDT).
+
+Comisión Servidor: Input numérico con un Toggle/Switch que permita definir si el monto ingresado está en USDT o en la moneda Fiat de la operación.
+
+Comportamiento: El backend debe unificar todas estas comisiones convirtiéndolas según la "Tasa de cambio utilizada" del formulario para arrojar la Ganancia Neta final precisa.
+
+4. Calculadora de Distribución de Socios (Lógica con Fee de Operador)
+Crea una herramienta independiente en el panel Admin que realice el siguiente cálculo matemático por pasos:
+
+Inputs requeridos: * Capital Invertido Operador (Admin).
+
+Capital Invertido Socio 1, Socio 2, Socio N.
+
+Ganancia Neta Total a repartir.
+
+Porcentaje de Comisión del Operador (Ej: 15%).
+
+Paso 1 (Fee de Trabajo): Descontar el porcentaje de comisión del operador de la Ganancia Neta Total.
+
+Paso 2 (Fondo a Repartir): Ganancia Neta Total - Fee de Trabajo = Fondo Restante.
+
+Paso 3 (Pool Total): Sumar todos los capitales invertidos (Operador + Socios).
+
+Paso 4 (Distribución): Calcular el peso porcentual de la inversión de cada individuo sobre el Pool Total. Multiplicar ese porcentaje por el Fondo Restante.
+
+Paso 5 (Output): Mostrar una tabla clara con lo que le corresponde a cada socio. Al operador debe sumársele su "Fee de Trabajo" más la ganancia de su capital invertido. Permitir guardar este reporte para que los socios lo vean en su Dashboard.
+
+5. Dashboard de Cierre del Día (Analíticas)
+
+Tarjetas de resumen con: Ganancias netas separadas por moneda (VES, USD, COP, PAB) y Total consolidado convertido a USDT.
+
+Total de comisiones pagadas (desglosadas en Banco, Binance, Servidor).
+
+Módulo de rendimiento de tiempo: Detectar y mostrar la operación con mayor ganancia en menor tiempo (Time-to-Profit) y la operación más larga.
+
+Gráficos de barras para comparar el volumen operado por cada plataforma (ej. Zinli vs Facebank).
+
+Genera la estructura del proyecto, los esquemas de la base de datos (SQL o Prisma/Drizzle) y comienza a construir la interfaz paso a paso empezando por la base de datos y la autenticación.
+
+
+Quiero en la barra de navegación otro botón de reporte pero que diga "Reportes de operaciones" donde se guarde todo esto automáticamente, cada "operación" guardada poder agruparla por monedas (seleccionar) y que me saques un reporte general de el "importe bruto operado", y las "cantidades recibidas"
+
+Tambien que gregues la función de poder exportarlo a WhatsApp el total "agrupado o individual" de forma ordenada, legible y detallado, más sin embargo tambien poderlo exportarlo en excel por si lo necesito.
