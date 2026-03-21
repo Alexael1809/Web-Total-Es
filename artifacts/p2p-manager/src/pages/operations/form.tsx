@@ -76,13 +76,14 @@ export default function OperationForm() {
         ...data,
         fecha: new Date(data.fecha).toISOString()
       }});
-      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
-      setLocation("/operaciones");
     } catch (e) {
       console.error(e);
-      alert("Error al guardar operación");
+      alert("Error al guardar la operación. Por favor intenta de nuevo.");
+      return;
     }
+    queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
+    setLocation("/operaciones");
   };
 
   return (

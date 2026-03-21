@@ -25,12 +25,14 @@ import {
 export default function Dashboard() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   
-  const { data, isLoading } = useGetDashboardSummary({
-    query: {
-      queryKey: ["/api/dashboard/summary", date]
-    },
-    request: undefined
-  });
+  const { data, isLoading } = useGetDashboardSummary(
+    { date },
+    {
+      query: {
+        queryKey: ["/api/dashboard/summary", date],
+      },
+    }
+  );
 
   if (isLoading) {
     return (
