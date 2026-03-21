@@ -8,32 +8,49 @@ const router = Router();
 
 router.get("/summary", authenticate, async (req, res) => {
   const dateStr = req.query.date as string | undefined;
-  let start: Date;
-  let end: Date;
+  const period = req.query.period as string | undefined; // 'today' | 'week' | 'month' | 'all'
 
-  if (dateStr) {
-    start = new Date(dateStr);
+  const conditions: any[] = [];
+
+  // Determine date range
+  if (period === "all" || (!period && !dateStr)) {
+    // No date filter — return all operations
+  } else if (period === "week") {
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
     start.setHours(0, 0, 0, 0);
-    end = new Date(dateStr);
+    const end = new Date();
     end.setHours(23, 59, 59, 999);
-  } else {
-    start = new Date();
+    conditions.push(gte(operationsTable.fecha, start), lte(operationsTable.fecha, end));
+  } else if (period === "month") {
+    const start = new Date();
+    start.setDate(1);
     start.setHours(0, 0, 0, 0);
-    end = new Date();
+    const end = new Date();
     end.setHours(23, 59, 59, 999);
+    conditions.push(gte(operationsTable.fecha, start), lte(operationsTable.fecha, end));
+  } else if (period === "today" || dateStr) {
+    const d = dateStr ? new Date(dateStr) : new Date();
+    const start = new Date(d);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(d);
+    end.setHours(23, 59, 59, 999);
+    conditions.push(gte(operationsTable.fecha, start), lte(operationsTable.fecha, end));
   }
 
-  const conditions = [gte(operationsTable.fecha, start), lte(operationsTable.fecha, end)];
   if (req.user?.role === "socio") {
     conditions.push(eq(operationsTable.userId, req.user.userId));
   }
 
-  const ops = await db.select().from(operationsTable).where(and(...conditions));
+  const ops = await db
+    .select()
+    .from(operationsTable)
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
 
   const gananciasNetas: Record<string, number> = { PAB: 0, USD: 0, VES: 0, COP: 0 };
   const comisionesTotales = { banco: 0, binance: 0, servidor: 0 };
-  let gananciasTotalesUsdt = 0;  // projected (all operations)
-  let gananciaRealUsdt = 0;      // real (only closed operations)
+  let gananciasTotalesUsdt = 0;
+  let gananciaRealUsdt = 0;
   let montoBrutoTotal = 0;
   let operacionesAbiertas = 0;
   let operacionesCerradas = 0;
@@ -76,29 +93,33 @@ router.get("/summary", authenticate, async (req, res) => {
     if (!masRentable || gnUsdt > parseFloat(masRentable.gananciaNetaUsdt)) {
       masRentable = op;
     }
-    if (!masLarga || new Date(op.createdAt).getTime() > new Date(masLarga.createdAt).getTime()) {
+    if (!masLarga || new Date(op.fecha).getTime() > new Date(masLarga.fecha).getTime()) {
       masLarga = op;
     }
   }
 
-  const volumenPorPlataforma = Object.entries(plataformaMap).map(([plataforma, data]) => ({
-    plataforma,
-    ...data,
-  }));
+  const volumenPorPlataforma = Object.entries(plataformaMap)
+    .map(([plataforma, data]) => ({ plataforma, ...data }))
+    .sort((a, b) => b.volumen - a.volumen);
 
-  const formatOp = (op: any) => op ? {
-    ...op,
-    tasaDeCambio: parseFloat(op.tasaDeCambio),
-    montoBruto: parseFloat(op.montoBruto),
-    comisionBanco: parseFloat(op.comisionBanco),
-    comisionBinance: parseFloat(op.comisionBinance),
-    comisionServidor: parseFloat(op.comisionServidor),
-    gananciaNeta: parseFloat(op.gananciaNeta),
-    gananciaNetaUsdt: parseFloat(op.gananciaNetaUsdt),
-    montoFinalUsdt: op.montoFinalUsdt != null ? parseFloat(op.montoFinalUsdt) : null,
-    gananciaRealUsdt: op.gananciaRealUsdt != null ? parseFloat(op.gananciaRealUsdt) : null,
-    receipts: [],
-  } : null;
+  const formatOp = (op: any) =>
+    op
+      ? {
+          ...op,
+          tasaDeCambio: parseFloat(op.tasaDeCambio),
+          montoBruto: parseFloat(op.montoBruto),
+          comisionBanco: parseFloat(op.comisionBanco),
+          comisionBinance: parseFloat(op.comisionBinance),
+          comisionServidor: parseFloat(op.comisionServidor),
+          gananciaNeta: parseFloat(op.gananciaNeta),
+          gananciaNetaUsdt: parseFloat(op.gananciaNetaUsdt),
+          montoFinalUsdt:
+            op.montoFinalUsdt != null ? parseFloat(op.montoFinalUsdt) : null,
+          gananciaRealUsdt:
+            op.gananciaRealUsdt != null ? parseFloat(op.gananciaRealUsdt) : null,
+          receipts: [],
+        }
+      : null;
 
   res.json({
     gananciasNetas,
