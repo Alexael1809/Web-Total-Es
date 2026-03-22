@@ -1,0 +1,10 @@
+.git
+.gitignore
+README.md
+node_modules
+artifacts/mockup-sandbox
+.local
+.replit
+.canvas
+replit.md
+uploads/

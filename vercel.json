@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm run build",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "projects": [
+    {
+      "name": "api-server",
+      "src": "artifacts/api-server",
+      "outputDirectory": "dist"
+    },
+    {
+      "name": "p2p-manager",
+      "src": "artifacts/p2p-manager",
+      "outputDirectory": "dist"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "destination": "http://api-server.vercel.app/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
