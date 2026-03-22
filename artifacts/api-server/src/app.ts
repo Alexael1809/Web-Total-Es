@@ -8,29 +8,27 @@ import { logger } from "./lib/logger.js";
 const app: Express = express();
 
 app.use(
-  pinoHttp({
-    logger,
-    serializers: {
-      req(req) {
-        return {
+  pinoHttp(
+    {
+      serializers: {
+        req: (req: any) => ({
           id: req.id,
           method: req.method,
           url: req.url?.split("?")[0],
-        };
-      },
-      res(res) {
-        return {
+        }),
+        res: (res: any) => ({
           statusCode: res.statusCode,
-        };
+        }),
       },
     },
-  }),
+    logger,
+  ),
 );
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const uploadsDir = path.resolve(process.cwd(), "uploads");
+const uploadsDir: string = path.resolve(process.cwd(), "uploads");
 app.use("/api/uploads", express.static(uploadsDir));
 
 app.use("/api", router);
