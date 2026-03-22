@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { db } from "@workspace/db";
 import { operationsTable, receiptsTable } from "@workspace/db/schema";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, inArray } from "drizzle-orm";
 import { GetOperationsQueryParams } from "@workspace/api-zod";
 import { z } from "zod";
 import { authenticate } from "../middlewares/auth.js";
@@ -202,7 +202,7 @@ router.delete("/:id", authenticate, async (req, res) => {
   res.json({ success: true, message: "Operación eliminada" });
 });
 
-// Cerrar Ciclo
+// Cerrar Ciclo (una operación)
 router.post("/:id/cerrar-ciclo", authenticate, async (req, res) => {
   const id = parseInt(req.params.id);
   const parsed = CerrarCicloBody.safeParse(req.body);
@@ -229,6 +229,72 @@ router.post("/:id/cerrar-ciclo", authenticate, async (req, res) => {
 
   const receipts = await db.select().from(receiptsTable).where(eq(receiptsTable.operationId, id));
   res.json(formatOperation(updated, receipts));
+});
+
+// Cerrar Ciclo (múltiples operaciones)
+const BatchCloseCicloBody = z.object({
+  operationIds: z.array(z.number()).min(1),
+  montoFinalUsdt: z.coerce.number().min(0),
+});
+
+router.post("/batch/close", authenticate, async (req, res) => {
+  const parsed = BatchCloseCicloBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "bad_request", message: "Datos inválidos", details: parsed.error.issues });
+    return;
+  }
+
+  const { operationIds, montoFinalUsdt } = parsed.data;
+
+  // Get all operations to close
+  const ops = await db.select().from(operationsTable).where(
+    and(
+      eq(operationsTable.statusCiclo, "abierta"),
+      inArray(operationsTable.id, operationIds)
+    )
+  );
+
+  if (ops.length === 0) {
+    res.status(400).json({ error: "bad_request", message: "No hay operaciones abiertas con esos IDs" });
+    return;
+  }
+
+  // Calculate total montoBruto
+  const totalMontoBruto = ops.reduce((sum, op) => sum + parseFloat(op.montoBruto as any), 0);
+  
+  // Distribute montoFinalUsdt proportionally
+  const gananciaRealTotal = montoFinalUsdt - totalMontoBruto;
+
+  // Update all operations
+  const updatePromises = ops.map((op) => {
+    const montoOp = parseFloat(op.montoBruto as any);
+    const proportion = totalMontoBruto > 0 ? montoOp / totalMontoBruto : 0;
+    const montoFinalOp = montoOp + (gananciaRealTotal * proportion);
+    const gananciaRealOp = montoFinalOp - montoOp;
+
+    return db.update(operationsTable).set({
+      statusCiclo: "cerrada",
+      montoFinalUsdt: montoFinalOp.toString(),
+      gananciaRealUsdt: gananciaRealOp.toString(),
+    }).where(eq(operationsTable.id, op.id)).returning();
+  });
+
+  const updated = await Promise.all(updatePromises);
+  
+  // Format response
+  const results = [];
+  for (const opUpdate of updated) {
+    const [op] = opUpdate;
+    const receipts = await db.select().from(receiptsTable).where(eq(receiptsTable.operationId, op.id));
+    results.push(formatOperation(op, receipts));
+  }
+
+  res.json({ 
+    success: true, 
+    message: `${results.length} operaciones cerradas`, 
+    operations: results,
+    totalGananciaReal: gananciaRealTotal,
+  });
 });
 
 // Upload receipt to Supabase Storage

@@ -43,14 +43,15 @@ function ConfirmModal({ message, onConfirm, onCancel, confirmLabel = "Confirmar"
 }
 
 interface CerrarCicloModalProps {
-  operationId: number;
+  operationId?: number;
   montoBruto: number;
   onConfirm: (montoFinal: number) => void;
   onCancel: () => void;
   isPending: boolean;
+  isBatch?: boolean;
 }
 
-function CerrarCicloModal({ operationId, montoBruto, onConfirm, onCancel, isPending }: CerrarCicloModalProps) {
+function CerrarCicloModal({ montoBruto, onConfirm, onCancel, isPending, isBatch = false }: CerrarCicloModalProps) {
   const [montoFinal, setMontoFinal] = useState(montoBruto);
   const ganancia = montoFinal - montoBruto;
 
@@ -59,7 +60,7 @@ function CerrarCicloModal({ operationId, montoBruto, onConfirm, onCancel, isPend
       <div className="glass-panel w-full max-w-md rounded-2xl p-6 shadow-2xl mx-4">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <CheckCircle2 className="w-6 h-6 text-success" /> Cerrar Ciclo
+            <CheckCircle2 className="w-6 h-6 text-success" /> {isBatch ? "Cerrar Ciclos" : "Cerrar Ciclo"}
           </h3>
           <button onClick={onCancel} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
             <X className="w-5 h-5" />
@@ -67,12 +68,15 @@ function CerrarCicloModal({ operationId, montoBruto, onConfirm, onCancel, isPend
         </div>
 
         <p className="text-muted-foreground text-sm mb-4">
-          Ingresa el monto final de USDT recibido tras recomprar en el mercado.
+          {isBatch 
+            ? "Ingresa el monto final total de USDT recibido tras recomprar."
+            : "Ingresa el monto final de USDT recibido tras recomprar en el mercado."
+          }
         </p>
 
         <div className="bg-white/5 rounded-xl p-4 mb-4 text-sm">
           <div className="flex justify-between mb-2">
-            <span className="text-muted-foreground">Monto Bruto Inicial</span>
+            <span className="text-muted-foreground">Monto Bruto Total</span>
             <span className="font-medium">{formatCurrency(montoBruto)} USDT</span>
           </div>
           <div className="flex justify-between mb-2">
@@ -113,7 +117,7 @@ function CerrarCicloModal({ operationId, montoBruto, onConfirm, onCancel, isPend
             disabled={isPending || montoFinal <= 0}
             className="flex-1 px-4 py-2.5 rounded-xl bg-success text-white font-bold hover:bg-success/80 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <CheckCircle2 className="w-4 h-4" /> Cerrar Ciclo
+            <CheckCircle2 className="w-4 h-4" /> {isBatch ? "Cerrar Ciclos" : "Cerrar Ciclo"}
           </button>
         </div>
       </div>
@@ -130,6 +134,14 @@ export default function OperationsList() {
 
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [cerrarCicloId, setCerrarCicloId] = useState<number | null>(null);
+  const [selectedBatch, setSelectedBatch] = useState<Set<number>>(new Set());
+  const [batchCerrarCiclo, setBatchCerrarCiclo] = useState(false);
+
+  const openOperations = operations?.filter((op) => (op as any).statusCiclo === "abierta") || [];
+  const totalBrutoBatch = Array.from(selectedBatch).reduce((sum, id) => {
+    const op = operations?.find((o) => o.id === id);
+    return sum + (op ? parseFloat(op.montoBruto.toString()) : 0);
+  }, 0);
 
   const handleDelete = async (id: number) => {
     await deleteMutation.mutateAsync({ id });
@@ -144,6 +156,42 @@ export default function OperationsList() {
     queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
     queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
     setCerrarCicloId(null);
+  };
+
+  const handleBatchCerrarCiclo = async (montoFinal: number) => {
+    const operationIds = Array.from(selectedBatch);
+    
+    const response = await fetch("/api/operations/batch/close", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("p2p_token")}`
+      },
+      body: JSON.stringify({
+        operationIds,
+        montoFinalUsdt: montoFinal
+      })
+    });
+
+    if (response.ok) {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
+      setSelectedBatch(new Set());
+      setBatchCerrarCiclo(false);
+    } else {
+      alert("Error al cerrar ciclos");
+    }
+  };
+
+  const toggleSelect = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSelected = new Set(selectedBatch);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedBatch(newSelected);
   };
 
   const opToClose = operations?.find((o) => o.id === cerrarCicloId);
@@ -162,11 +210,21 @@ export default function OperationsList() {
 
       {cerrarCicloId !== null && opToClose && (
         <CerrarCicloModal
-          operationId={cerrarCicloId}
           montoBruto={Number(opToClose.montoBruto)}
           onConfirm={handleCerrarCiclo}
           onCancel={() => setCerrarCicloId(null)}
           isPending={cerrarCicloMutation.isPending}
+          isBatch={false}
+        />
+      )}
+
+      {batchCerrarCiclo && (
+        <CerrarCicloModal
+          montoBruto={totalBrutoBatch}
+          onConfirm={handleBatchCerrarCiclo}
+          onCancel={() => setBatchCerrarCiclo(false)}
+          isPending={false}
+          isBatch={true}
         />
       )}
 
@@ -175,11 +233,21 @@ export default function OperationsList() {
           <h1 className="text-3xl font-display font-bold text-foreground">Operaciones</h1>
           <p className="text-muted-foreground mt-1">Gestiona el registro de tus arbitrajes.</p>
         </div>
-        <Link href="/operaciones/nueva" className="block">
-          <div className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(0,165,255,0.3)] hover:shadow-[0_0_20px_rgba(0,165,255,0.5)]">
-            <Plus className="w-5 h-5" /> Nueva Operación
-          </div>
-        </Link>
+        <div className="flex gap-2">
+          {selectedBatch.size > 0 && (
+            <button
+              onClick={() => setBatchCerrarCiclo(true)}
+              className="bg-success hover:bg-success/80 text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all"
+            >
+              <CheckCircle2 className="w-5 h-5" /> Cerrar {selectedBatch.size} ciclo{selectedBatch.size > 1 ? "s" : ""}
+            </button>
+          )}
+          <Link href="/operaciones/nueva" className="block">
+            <div className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(0,165,255,0.3)] hover:shadow-[0_0_20px_rgba(0,165,255,0.5)]">
+              <Plus className="w-5 h-5" /> Nueva Operación
+            </div>
+          </Link>
+        </div>
       </div>
 
       <div className="glass-panel rounded-2xl overflow-hidden">
@@ -187,6 +255,20 @@ export default function OperationsList() {
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-white/5 border-b border-border">
+                <th className="px-4 py-4 text-sm font-medium text-muted-foreground w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectedBatch.size === openOperations.length && openOperations.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedBatch(new Set(openOperations.map(op => op.id)));
+                      } else {
+                        setSelectedBatch(new Set());
+                      }
+                    }}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                </th>
                 <th className="px-4 py-4 text-sm font-medium text-muted-foreground">Estado</th>
                 <th className="px-4 py-4 text-sm font-medium text-muted-foreground">Fecha</th>
                 <th className="px-4 py-4 text-sm font-medium text-muted-foreground">Ruta</th>
@@ -199,11 +281,11 @@ export default function OperationsList() {
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Cargando...</td>
+                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Cargando...</td>
                 </tr>
               ) : operations?.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                     <FileText className="w-12 h-12 mx-auto mb-3 opacity-20" />
                     No hay operaciones registradas.
                   </td>
@@ -211,9 +293,23 @@ export default function OperationsList() {
               ) : (
                 operations?.map((op) => {
                   const isCerrada = (op as any).statusCiclo === "cerrada";
+                  const isSelected = selectedBatch.has(op.id);
                   const gananciaReal = (op as any).gananciaRealUsdt;
+                  const canSelect = !isCerrada;
+                  
                   return (
                     <tr key={op.id} className="hover:bg-white/5 transition-colors group cursor-pointer" onClick={() => setLocation(`/operaciones/${op.id}`)}>
+                      <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {canSelect && (
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => toggleSelect(op.id, e as any)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                        )}
+                      </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex flex-col gap-2">
                           {isCerrada ? (
@@ -264,7 +360,7 @@ export default function OperationsList() {
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                      <td className="px-4 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {!isCerrada && (
                             <button
