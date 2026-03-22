@@ -1,18 +1,15 @@
 import { Router } from "express";
 import multer from "multer";
-import path from "path";
 import { db } from "@workspace/db";
 import { operationsTable, receiptsTable } from "@workspace/db/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { GetOperationsQueryParams } from "@workspace/api-zod";
 import { z } from "zod";
 import { authenticate } from "../middlewares/auth.js";
-import fs from "fs";
+import { supabase, RECEIPTS_BUCKET } from "../lib/supabase.js";
 
 const router = Router();
 
-// New formula: tasa is the spread multiplier (e.g. 1.08 = 8% profit)
-// montoBruto is in USDT; all commissions in USDT
 const CreateOperationBody = z.object({
   fecha: z.string().min(1),
   moneda: z.string().min(1),
@@ -34,20 +31,9 @@ const CerrarCicloBody = z.object({
   montoFinalUsdt: z.coerce.number().min(0),
 });
 
-const uploadsDir = path.resolve(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+// Use memory storage — files go straight to Supabase Storage
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const storage = multer.diskStorage({
-  destination: uploadsDir,
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${unique}${path.extname(file.originalname)}`);
-  },
-});
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
-
-// New calculation: tasa = spread multiplier (1.08 = 8% profit per USDT)
-// All commissions are in USDT
 function calculateNetProfit(
   montoBruto: number,
   tasa: number,
@@ -55,12 +41,11 @@ function calculateNetProfit(
   comisionBinance: number,
   comisionServidor: number
 ) {
-  const spread = tasa - 1; // e.g. 1.08 - 1 = 0.08
+  const spread = tasa - 1;
   const gananciaBrutaUsdt = montoBruto * spread;
   const totalComisiones = comisionBanco + comisionBinance + comisionServidor;
   const gananciaNetaUsdt = gananciaBrutaUsdt - totalComisiones;
-  const gananciaNeta = gananciaNetaUsdt; // stored as USDT equivalent
-  return { gananciaNeta, gananciaNetaUsdt };
+  return { gananciaNeta: gananciaNetaUsdt, gananciaNetaUsdt };
 }
 
 function formatOperation(op: any, receipts: any[]) {
@@ -205,11 +190,19 @@ router.put("/:id", authenticate, async (req, res) => {
 
 router.delete("/:id", authenticate, async (req, res) => {
   const id = parseInt(req.params.id);
+
+  // Delete all associated receipt files from Supabase Storage
+  const receipts = await db.select().from(receiptsTable).where(eq(receiptsTable.operationId, id));
+  if (receipts.length > 0) {
+    const filePaths = receipts.map(r => r.filename);
+    await supabase.storage.from(RECEIPTS_BUCKET).remove(filePaths);
+  }
+
   await db.delete(operationsTable).where(eq(operationsTable.id, id));
   res.json({ success: true, message: "Operación eliminada" });
 });
 
-// Cerrar Ciclo: register the final USDT received after buying back
+// Cerrar Ciclo
 router.post("/:id/cerrar-ciclo", authenticate, async (req, res) => {
   const id = parseInt(req.params.id);
   const parsed = CerrarCicloBody.safeParse(req.body);
@@ -238,6 +231,7 @@ router.post("/:id/cerrar-ciclo", authenticate, async (req, res) => {
   res.json(formatOperation(updated, receipts));
 });
 
+// Upload receipt to Supabase Storage
 router.post("/:id/receipts", authenticate, upload.single("file"), async (req, res) => {
   const operationId = parseInt(req.params.id);
   if (!req.file) {
@@ -249,33 +243,50 @@ router.post("/:id/receipts", authenticate, upload.single("file"), async (req, re
     res.status(400).json({ error: "bad_request", message: "Tipo debe ser 'enviado' o 'recibido'" });
     return;
   }
-  const url = `/api/uploads/${req.file.filename}`;
+
+  const ext = req.file.originalname.split(".").pop() || "bin";
+  const filename = `op-${operationId}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(RECEIPTS_BUCKET)
+    .upload(filename, req.file.buffer, {
+      contentType: req.file.mimetype,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    res.status(500).json({ error: "storage_error", message: "Error al subir archivo: " + uploadError.message });
+    return;
+  }
+
+  const { data: { publicUrl } } = supabase.storage.from(RECEIPTS_BUCKET).getPublicUrl(filename);
+
   const [receipt] = await db.insert(receiptsTable).values({
     operationId,
-    filename: req.file.filename,
-    url,
+    filename,
+    url: publicUrl,
     type,
   }).returning();
+
   res.status(201).json(receipt);
 });
 
+// Delete receipt from Supabase Storage
 router.delete("/:id/receipts/:receiptId", authenticate, async (req, res) => {
   const operationId = parseInt(req.params.id);
   const receiptId = parseInt(req.params.receiptId);
-  
+
   const [receipt] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receiptId));
   if (!receipt || receipt.operationId !== operationId) {
     res.status(404).json({ error: "not_found", message: "Recibo no encontrado" });
     return;
   }
-  
-  const filePath = path.resolve(uploadsDir, receipt.filename);
-  try {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  } catch (err) {
-    console.error("Error deleting file:", err);
+
+  const { error: removeError } = await supabase.storage.from(RECEIPTS_BUCKET).remove([receipt.filename]);
+  if (removeError) {
+    console.error("Error removing file from Supabase Storage:", removeError.message);
   }
-  
+
   await db.delete(receiptsTable).where(eq(receiptsTable.id, receiptId));
   res.json({ success: true, message: "Recibo eliminado" });
 });

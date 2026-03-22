@@ -11,12 +11,13 @@ Plataforma de gestión de arbitraje P2P — aplicación full-stack completamente
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
+- **Database**: Supabase PostgreSQL + Drizzle ORM
+- **Auth**: Supabase Auth (signInWithPassword) + JWT propio para roles (jsonwebtoken)
+- **Storage**: Supabase Storage (bucket `receipts` — público para lectura)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 - **Frontend**: React + Vite, Tailwind CSS, Shadcn UI
-- **Auth**: JWT (jsonwebtoken + bcryptjs)
 - **Charts**: Recharts
 - **Forms**: react-hook-form + zod
 - **Excel Export**: xlsx (SheetJS)
@@ -42,62 +43,63 @@ artifacts-monorepo/
 
 ## Authentication
 
-- JWT tokens stored in localStorage under key `p2p_token`
-- Admin seed: email `alexaelperdomo1809@gmail.com` / password `Server_1005$`
-- Roles: `admin` (full access), `socio` (read-only personal stats)
-- JWT secret: env var `JWT_SECRET` (defaults to internal secret)
+- **Login**: Supabase Auth (`supabase.auth.signInWithPassword`) → genera JWT propio con rol
+- JWT tokens almacenados en localStorage bajo clave `p2p_token`
+- Admin: `alexaelperdomo1809@gmail.com` / `Server_1005$`
+- Socio: `carlos.socio@demo.com` / `Socio_2025$`
+- Roles: `admin` (acceso completo), `socio` (estadísticas personales)
+- Supabase UIDs vinculados en columna `supabase_uid` de la tabla `users`
+
+## Supabase Integration
+
+- **SUPABASE_URL**: URL del proyecto Supabase
+- **SUPABASE_ANON_KEY**: Clave anon/public (46 chars)
+- **SUPABASE_SERVICE_ROLE_KEY**: Clave service_role JWT (219 chars, empieza con eyJ)
+- **SUPABASE_DATABASE_URL**: Connection string PostgreSQL directo
+- Backend usa `@supabase/supabase-js` con service_role para bypassear RLS
+- Storage bucket `receipts` es público (lectura sin auth), escritura solo desde servidor
 
 ## Database Tables
 
-- `users` — Admin and Socio users
-- `payment_methods` — Configurable payment platforms (Zinli, Facebank, etc.)
-- `operations` — P2P arbitrage operations; has `status_ciclo` (abierta/cerrada), `plataforma_intermediaria`, `monto_final_usdt`, `ganancia_real_usdt`
-- `receipts` — Payment proof screenshots linked to operations
-- `distribution_reports` — Saved capital distribution calculations
+- `users` — Usuarios Admin y Socio; tiene columna `supabase_uid` para vincular con Supabase Auth
+- `payment_methods` — Plataformas de pago configurables (Zinli, Facebank, etc.)
+- `currencies` — Monedas (VES, COP, USD, PAB)
+- `operations` — Operaciones P2P; tiene `status_ciclo` (abierta/cerrada), `tasa_compra`, `tasa_venta`
+- `receipts` — Comprobantes de pago (URLs de Supabase Storage, organizados por tipo enviado/recibido)
+- `distribution_reports` — Cálculos de distribución de capital guardados
 
 ## Key Formulas
 
-- `tasa_de_cambio` = spread multiplier (e.g. 1.08 = 8% profit)
+- `tasa_de_cambio` = multiplicador spread (ej. 1.08 = 8% ganancia)
 - `ganancia_bruta_usdt = monto_bruto × (tasa - 1)`
-- All 3 commissions (banco, binance, servidor) are in USDT
+- Las 3 comisiones (banco, binance, servidor) están en USDT
 - `ganancia_neta_usdt = ganancia_bruta - comBanco - comBinance - comServidor`
+- Modo T/C: `tasa = tasa_venta / tasa_compra`
 - Cerrar Ciclo: `ganancia_real_usdt = monto_final_usdt - monto_bruto`
 
-## Test Data (Seed)
+## File Uploads (Receipts)
 
-- 6 operations: 4 cerradas + 2 abiertas
-- Extra socio: `carlos.socio@demo.com` / `Socio_2025$`
-- 7 payment methods: Binance, Zinli, Wise, PayPal, Pago Móvil, Reserve, Zelle
+- Archivos subidos a Supabase Storage bucket `receipts`
+- Organizados por operación: `op-{id}/{timestamp}-{random}.{ext}`
+- URLs públicas: `https://{project}.supabase.co/storage/v1/object/public/receipts/...`
+- Eliminación limpia: borra de Storage + DB
 
 ## API Endpoints
 
-- `POST /api/auth/login` — Login
-- `GET /api/auth/me` — Current user
-- `GET/POST /api/users` — User management (Admin)
-- `DELETE /api/users/:id` — Delete user (Admin)
-- `GET/POST /api/payment-methods` — Payment methods
-- `DELETE /api/payment-methods/:id` — Delete payment method (Admin)
-- `GET/POST /api/operations` — Operations CRUD
-- `PUT/DELETE /api/operations/:id` — Update/delete operation
-- `POST /api/operations/:id/receipts` — Upload receipt (multipart)
-- `GET /api/dashboard/summary` — Daily analytics dashboard
-- `POST /api/distribution/calculate` — Calculate capital distribution
-- `GET/POST /api/distribution/reports` — Distribution reports
-- `GET /api/reports/operations` — Operations report with grouping
-
-## Net Profit Calculation Logic
-
-1. `spreadUsdt = montoBruto / tasaDeCambio`
-2. `comisionBancoUsdt = comisionBanco / tasaDeCambio`
-3. `comisionServidorUsdt = comisionServidorEnUsdt ? comisionServidor : comisionServidor / tasaDeCambio`
-4. `totalComisionesUsdt = comisionBancoUsdt + comisionBinance + comisionServidorUsdt`
-5. `gananciaNetaUsdt = spreadUsdt - totalComisionesUsdt`
-6. `gananciaNeta = gananciaNetaUsdt * tasaDeCambio`
-
-## Uploads
-
-Files uploaded to `artifacts/api-server/uploads/`, served at `/api/uploads/<filename>`
-
-## Supabase Migration Note
-
-When migrating to Supabase, replace the `DATABASE_URL` environment variable with the Supabase connection string. The Drizzle schema and all queries are compatible.
+- `POST /api/auth/login` — Login (via Supabase Auth)
+- `GET /api/auth/me` — Usuario actual
+- `GET/POST /api/users` — Gestión de usuarios (Admin)
+- `DELETE /api/users/:id` — Eliminar usuario (Admin + Supabase Auth)
+- `GET/POST /api/payment-methods` — Métodos de pago
+- `DELETE /api/payment-methods/:id` — Eliminar método (Admin)
+- `GET/POST /api/currencies` — Monedas
+- `DELETE /api/currencies/:id` — Eliminar moneda
+- `GET/POST /api/operations` — CRUD operaciones
+- `PUT/DELETE /api/operations/:id` — Actualizar/eliminar operación
+- `POST /api/operations/:id/cerrar-ciclo` — Cerrar ciclo
+- `POST /api/operations/:id/receipts` — Subir comprobante (→ Supabase Storage)
+- `DELETE /api/operations/:id/receipts/:receiptId` — Eliminar comprobante
+- `GET /api/dashboard/summary` — Dashboard analítico
+- `POST /api/distribution/calculate` — Calcular distribución de capital
+- `GET/POST /api/distribution/reports` — Reportes de distribución
+- `GET /api/reports/operations` — Reporte de operaciones

@@ -7,10 +7,17 @@ if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error("SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY son requeridos");
 }
 
+// Service role client bypasses RLS for all operations
 export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
+    detectSessionInUrl: false,
+  },
+  global: {
+    headers: {
+      Authorization: `Bearer ${supabaseServiceKey}`,
+    },
   },
 });
 
