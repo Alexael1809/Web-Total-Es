@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "buildCommand": "cd ../../ && pnpm run build --filter @workspace/p2p-manager",
+  "installCommand": "cd ../../ && pnpm install --frozen-lockfile",
+  "framework": "vite",
+  "outputDirectory": "dist"
+}
